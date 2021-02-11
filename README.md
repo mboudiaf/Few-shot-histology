@@ -11,13 +11,13 @@ Here is a rough overview of the different modules of the data pipeline and how t
 
 The general idea is that each `*.tfrecords` represents a class of a dataset. Therefore, we can create one TFRecordDataset per class. So for each dataset (e.g breakhis), we will have a list of all TFRecordDataset (one per class), which are randomly sampled from.
 
-## Requirements
+## Data
 
-#### Downloading pre-existing
+#### Downloading data (recommended)
 
 I have put all the converted data at [converted_data](https://drive.google.com/file/d/1W2xxzag9oetbXlR5lcxeRjlmq1ibNFjm/view?usp=sharing).
 
-#### Direct download does not work ?
+#### Direct download does not work ? (not tested from scratch)
 
 In this case, you will need to download the data by yourself, and put all folders in a single folder. Then you can run the conversion script `scripts/convert_datasets.sh` (please before doing this, change the data_root and record_root path):
 
@@ -93,9 +93,13 @@ For both the episodic and batch datasets, you can use multiples source datasets 
 
 **Episodic dataset**: In the case where multiples sources are provided (through `--sources`), the dataset will first randomly chose a source, then provide an episode from this source only. Hence, samples from different sources are never mixed in the same task.
 
-#### Transforms
+#### Options
 
-The transforms are defined in `transforms.py` and can be passed as arguments to the dataset (as in standard pytorch datasets)
+There exist several options to build the dataset. If you want the full list, please use:
+```python
+    python3 example.py --help
+```
+ IF you want to know all possible transforms, go to `transforms.py`.
 
 
 ## Contributions
