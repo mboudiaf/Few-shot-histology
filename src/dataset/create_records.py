@@ -1,6 +1,6 @@
 from absl import logging
-from dataset.utils import Split
-import dataset.dataset_spec as ds_spec
+from utils import Split
+import dataset_spec as ds_spec
 import numpy as np
 import tensorflow.compat.v1 as tf
 import os
@@ -332,7 +332,7 @@ class DatasetConverter(object):
         """Sets self.dataset_spec to an initial BiLevelDatasetSpecification."""
         # Maps each Split to the number of superclasses assigned to it.
         self.superclasses_per_split = {
-                Split.TRAIN: 0,
+                Split.TRAIN: 6,
                 Split.VALID: 0,
                 Split.TEST: 0
         }
@@ -522,14 +522,18 @@ class SimpleConverter(DatasetConverter):
 
         # Split into train, validation and test splits that have 70% / 15% / 15%
         # of the data, respectively.
-        num_trainval_classes = int(0.85 * num_classes)
-        num_train_classes = int(0.7 * num_classes)
-        num_valid_classes = num_trainval_classes - num_train_classes
-        num_test_classes = num_classes - num_trainval_classes
 
-        train_inds, valid_inds, test_inds = gen_rand_split_inds(num_train_classes,
-                                                                num_valid_classes,
-                                                                num_test_classes)
+        train_inds = range(num_classes)
+        valid_inds = []
+        test_inds = []
+        # num_trainval_classes = int(0. * num_classes)
+        # num_train_classes = int(1.0 * num_classes)
+        # num_valid_classes = num_trainval_classes - num_train_classes
+        # num_test_classes = num_classes - num_trainval_classes
+
+        # train_inds, valid_inds, test_inds = gen_rand_split_inds(num_train_classes,
+        #                                                         num_valid_classes,
+        #                                                         num_test_classes)
         splits = {Split.TRAIN: [class_names[i] for i in train_inds],
                   Split.VALID: [class_names[i] for i in valid_inds],
                   Split.TEST: [class_names[i] for i in test_inds]}
@@ -628,9 +632,9 @@ class BilevelConverter(DatasetConverter):
         # out of the 'background' set of magnifs that are intended for train/val
         # We keep the 'evaluation' set of magnifs for testing exclusively
         # The chosen magnifs have 14, 14, 16, 17, and 20 canceracters, respectively.
-        training_magnifs = ['40X', '100X']
-        validation_magnifs = ['200X']
-        test_magnifs = ['400X']
+        training_magnifs = ['40X', '100X', '200X', '400X']
+        validation_magnifs = []
+        test_magnifs = []
 
         self.parse_split_data(Split.TRAIN, training_magnifs)
         self.parse_split_data(Split.VALID, validation_magnifs)

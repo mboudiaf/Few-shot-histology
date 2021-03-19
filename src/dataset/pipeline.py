@@ -91,6 +91,7 @@ class EpisodicDataset(torch.utils.data.IterableDataset):
                  max_query_size: int):
         super(EpisodicDataset).__init__()
         self.class_datasets = class_datasets
+        self.iter_datasets = class_datasets
         self.sampler = sampler
         self.transforms = transforms
         self.max_query_size = max_query_size
@@ -121,10 +122,10 @@ class EpisodicDataset(torch.utils.data.IterableDataset):
 
     def get_next(self, class_id):
         try:
-            sample_dic = next(self.class_datasets[class_id])
+            sample_dic = next(self.iter_datasets[class_id])
         except:
-            self.class_datasets[class_id] = iter(self.class_datasets[class_id])
-            sample_dic = next(self.class_datasets[class_id])
+            self.iter_datasets[class_id] = cycle_(self.class_datasets[class_id])
+            sample_dic = next(self.iter_datasets[class_id])
         return sample_dic
 
 
@@ -134,16 +135,17 @@ class BatchDataset(torch.utils.data.IterableDataset):
                  transforms: torchvision.transforms):
         super(BatchDataset).__init__()
         self.class_datasets = class_datasets
+        self.iter_datasets = class_datasets
         self.transforms = transforms
 
     def __iter__(self):
         while True:
             rand_class = RNG.randint(len(self.class_datasets))
             try:
-                sample_dic = next(self.class_datasets[rand_class])
+                sample_dic = next(self.iter_datasets[rand_class])
             except:
-                self.class_datasets[rand_class] = iter(self.class_datasets[rand_class])
-                sample_dic = next(self.class_datasets[rand_class])
+                self.iter_datasets[rand_class] = cycle_(self.class_datasets[rand_class])
+                sample_dic = next(self.iter_datasets[rand_class])
             transformed_image = self.transforms(sample_dic['image'])
             target = sample_dic['label'][0]
             yield transformed_image, target
@@ -153,13 +155,25 @@ class ZipDataset(torch.utils.data.IterableDataset):
     def __init__(self,
                  dataset_list: List[EpisodicDataset]):
         self.episodic_dataset_list = dataset_list
+        self.iter_list = dataset_list
 
     def __iter__(self):
         while True:
             rand_source: int = RNG.randint(len(self.episodic_dataset_list))
             try:
-                next_e = next(self.episodic_dataset_list[rand_source])
+                next_e = next(self.iter_list[rand_source])
             except:
-                self.episodic_dataset_list[rand_source] = iter(self.episodic_dataset_list[rand_source])
-                next_e = next(self.episodic_dataset_list[rand_source])
+                self.iter_list[rand_source] = iter(self.episodic_dataset_list[rand_source])
+                next_e = next(self.iter_list[rand_source])
             yield next_e
+
+
+def cycle_(iterable):
+    # Creating custom cycle since itertools.cycle attempts to save all outputs in order to
+    # re-cycle through them, creating amazing memory leak
+    iterator = iter(iterable)
+    while True:
+        try:
+            yield next(iterator)
+        except StopIteration:
+            iterator = iter(iterable)

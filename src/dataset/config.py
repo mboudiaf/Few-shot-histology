@@ -12,7 +12,6 @@ class DataConfig(object):
         """
 
         # General info
-        self.sources = args.sources
         self.data_path = args.data_path
         self.batch_size = args.batch_size
         self.num_workers = args.num_workers

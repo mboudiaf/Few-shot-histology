@@ -1,0 +1,48 @@
+
+DATA:
+  image_size: 126 # Images will be resized to this value
+  train_sources: ['crc-tp'] # Which dataset to use
+  val_sources: ['lc25000'] # Which dataset to use
+  test_sources: ['breakhist'] # Which dataset to use
+  train_transforms: ['random_resized_crop', 'random_flip']
+  test_transforms: ['resize', 'center_crop'] #Transforms applied to training data
+  data_path: '/ssd/dataset/histology/converted/'
+  ckpt_path: 'checkpoints'
+
+TRAINING:
+  arch: 'resnet18'
+  batch_size: 64
+  num_workers: 2
+  eval_freq: 500
+  train_freq: 100
+  train_iter: 100000
+  eval_iter: 300
+  loss: '_CrossEntropy'
+  focal_gamma: 3
+  label_smoothing: 0.
+
+AUGMENTATIONS:
+  beta: 1.0
+  cutmix_prob: 1.0
+  augmentation: 'none'
+
+OPTIM:
+  lr: 0.01
+  momentum: 0.9
+  weight_decay: 0.0001
+  nesterov: True
+  gamma: 0.1
+
+EPISODES:
+  num_ways: 5  # Set it if you want a fixed # of ways per task
+  num_support: 1 # Set it if you want a fixed # of support samples per class
+  num_query: 15 # Set it if you want a fixed # of query samples per class
+  min_ways: 2 # Minimum # of ways per task')
+  max_ways_upper_bound: 10 # Maximum # of ways per task
+  max_num_query: 10 # Maximum # of query samples
+  max_support_set_size: 100 # Maximum # of support samples
+  min_examples_in_class: 0 # Classes that have less samples will be skipped
+  max_support_size_contrib_per_class: 10 # Maximum # of support samples per class
+  min_log_weight: -0.69314718055994529 # Do not touch, used to randomly sample support set
+  max_log_weight: 0.69314718055994529 # Do not touch, used to randomly sample support set
+  ignore_bilevel_ontology: False  #Whether or not to use superclass for BiLevel datasets (e.g breakhist)

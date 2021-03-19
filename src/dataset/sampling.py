@@ -42,7 +42,7 @@ def sample_class_ids_uniformly(num_ways: int,
     Returns:
       class_ids: np.array, class IDs for the episode, with values in rel_classes.
     """
-    return RNG.choice(rel_classes, num_ways, replace=False)
+    return RNG.choice(rel_classes, min(num_ways, len(rel_classes)), replace=False)
 
 
 def compute_num_query(images_per_class: np.ndarray,
