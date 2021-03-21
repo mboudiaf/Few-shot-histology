@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import argparse
-from .utils import get_one_hot
+from .utils import get_one_hot, compute_centroids, extract_features
 from .method import FSmethod
 
 
-class Simpleshot(FSmethod):
+class SimpleShot(FSmethod):
     '''
     Simple Shot method
     '''
@@ -14,23 +14,6 @@ class Simpleshot(FSmethod):
 
         self.episodic_training = False
         super().__init__(args)
-
-    def compute_centroids(self,
-                          z_s: torch.tensor,
-                          y_s: torch.tensor):
-        """
-        inputs:
-            z_s : torch.Tensor of shape [s_shot, d]
-            y_s : torch.Tensor of shape [s_shot]
-
-        updates :
-            self.weights : torch.Tensor of shape [n_task, num_class, d]
-        """
-        one_hot = get_one_hot(y_s)  # [s_shot, K]
-        counts = one_hot.sum(0)  # [K]
-        weights = one_hot.transpose(0, 1).matmul(z_s)  # [K, d]
-        centroids = weights / counts.unsqueeze(1)
-        return centroids
 
     def forward(self,
                 x_s: torch.tensor,
@@ -45,14 +28,13 @@ class Simpleshot(FSmethod):
             y_s : torch.Tensor of shape [s_shot]
             y_q : torch.Tensor of shape [q_shot]
         """
-        z_s = model.extract_features(x_s)  # [s_shot, d]
-        z_q = model.extract_features(x_q)  # [q_shot, d]
 
-        centroids = self.compute_centroids(z_s, y_s)  # [s_shot, K]
+        z_s, z_q = extract_features(x_s, x_q, model)
+        centroids = compute_centroids(z_s, y_s)  # [batch, num_class, d]
 
-        l2_distance = (- 2 * z_q.matmul(centroids.transpose(0, 1)) \
-                        + (centroids**2).sum(1).view(1, -1)  #  # noqa: E127
-                        + (z_q**2).sum(1).view(-1, 1))  # [q_shot, K]
+        l2_distance = (- 2 * z_q.matmul(centroids.transpose(1, 2)) \
+                        + (centroids**2).sum(2).unsqueeze(1)  # noqa: E127
+                        + (z_q**2).sum(2).unsqueeze(-1))  # [batch, q_shot, num_class]
 
         preds_q = l2_distance.argmin(-1)
         return None, preds_q

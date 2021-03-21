@@ -3,6 +3,9 @@
 *.sublime-project
 *.sublime-workspace
 checkpoints/
+**/import
+**/deploy
+**beluga**
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

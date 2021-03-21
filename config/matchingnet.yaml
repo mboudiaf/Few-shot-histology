@@ -1,0 +1,4 @@
+METHOD:
+  method: 'MatchingNet'
+  batch_size: 1
+  eps: 0.00000001

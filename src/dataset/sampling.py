@@ -246,9 +246,9 @@ class EpisodeDescriptionSampler(object):
             self.use_bilevel_hierarchy = False  # noqa: E111
 
         if self.use_bilevel_hierarchy:
-            if self.num_ways is not None:  # noqa: E111
-                raise ValueError('"use_bilevel_hierarchy" is incompatible with '
-                                 '"num_ways".')
+            # if self.num_ways is not None:  # noqa: E111
+            #     raise ValueError('"use_bilevel_hierarchy" is incompatible with '
+            #                      '"num_ways".')
             if self.min_examples_in_class > 0:  # noqa: E111
                 raise ValueError('"use_bilevel_hierarchy" is incompatible with '
                                  '"min_examples_in_class".')
@@ -284,22 +284,31 @@ class EpisodeDescriptionSampler(object):
             episode_superclass = RNG.choice(self.superclass_set, 1)[0]  # noqa: E111
             num_superclass_classes = self.dataset_spec.classes_per_superclass[  # noqa: E111
                 episode_superclass]
-
-            num_ways = sample_num_ways_uniformly(  # noqa: E111
-                num_superclass_classes,
-                min_ways=self.min_ways,
-                max_ways=self.max_ways_upper_bound)
+            if self.num_ways:
+                if self.num_ways > num_superclass_classes:
+                    raise ValueError('{} classes required but superclass {} only contains {} classes'.format(
+                                        self.num_ways,
+                                        episode_superclass,
+                                        num_superclass_classes))
+                num_ways = self.num_ways
+            else:
+                num_ways = sample_num_ways_uniformly(  # noqa: E111
+                    num_superclass_classes,
+                    min_ways=self.min_ways,
+                    max_ways=self.max_ways_upper_bound)
 
             # e.g. if these are [3, 1] then the 4'th and the 2'nd of the subclasses
             # that belong to the chosen superclass will be used. If the class id's
             # that belong to this superclass are [23, 24, 25, 26] then the returned
             # episode_classes_rel will be [26, 24] which as usual are number relative
             # to the split.
-            episode_subclass_ids = sample_class_ids_uniformly(num_ways,  # noqa: E111
-                                                              num_superclass_classes)
-            (episode_classes_rel,  # noqa: E111
-             _) = self.dataset_spec.get_class_ids_from_superclass_subclass_inds(
-                 self.split, episode_superclass, episode_subclass_ids)
+            episode_subclass_ids = sample_class_ids_uniformly(
+                                        num_ways,
+                                        range(num_superclass_classes))
+
+            (episode_classes_rel,  _) = \
+                self.dataset_spec.get_class_ids_from_superclass_subclass_inds(
+                self.split, episode_superclass, episode_subclass_ids)
         elif self.use_all_classes:
             episode_classes_rel = np.arange(self.num_classes)  # noqa: E111
         else:  # No type of hierarchy is used. Classes are randomly sampled.

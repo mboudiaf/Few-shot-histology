@@ -3,7 +3,6 @@ import torch
 import argparse
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim import SGD
 from typing import Dict
 from tqdm import tqdm
 import numpy as np
@@ -15,12 +14,13 @@ from models import __dict__ as all_models
 from methods import __dict__ as all_methods
 from losses import __dict__ as all_losses
 from utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
-                   save_checkpoint, get_model_dir, CfgNode
+                   save_checkpoint, get_model_dir, load_checkpoint
+from train import get_dataloader
 
 
 def parse_args() -> argparse.Namespace:
 
-    parser = argparse.ArgumentParser(description='Training')
+    parser = argparse.ArgumentParser(description='Testing')
     parser.add_argument('--base_config', type=str, required=True, help='Base config file')
     parser.add_argument('--method_config', type=str, default=True, help='Base config file')
     parser.add_argument('--opts', default=None, nargs=argparse.REMAINDER)
@@ -39,150 +39,56 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_dir = get_model_dir(args)
 
-    # ============ Data spec ================
-    data_config = config_lib.DataConfig(args)
-    episod_config = config_lib.EpisodeDescriptionConfig(args)
-    datasets = data_config.sources
-    use_bilevel_ontology_list = [False]*len(datasets)
-    if episod_config.num_ways and len(datasets) > 1:
-        raise ValueError('For fixed episodes, not tested yet on > 1 dataset')
-    else:
-        # Enable ontology aware sampling for breakhis
-        if 'breakhis' in datasets:
-            use_bilevel_ontology_list[datasets.index('breakhis')] = True
-    episod_config.use_bilevel_ontology_list = use_bilevel_ontology_list
-
-    all_dataset_specs = []
-    for dataset_name in datasets:
-        dataset_records_path = os.path.join(data_config.data_path, dataset_name)
-        dataset_spec = dataset_spec_lib.load_dataset_spec(dataset_records_path)
-        all_dataset_specs.append(dataset_spec)
-
     # ============ Testing method ================
     method = all_methods[args.method](args=args)
 
     # ============ Data loaders =========
-    test_dataset = pipeline.make_episode_pipeline(dataset_spec_list=all_dataset_specs,
-                                                  split=Split["TEST"],
-                                                  data_config=data_config,
-                                                  episode_descr_config=episod_config)
+    _, num_classes_tr = get_dataloader(args=args,
+                                       sources=args.train_sources,
+                                       episodic=method.episodic_training,
+                                       batch_size=args.batch_size,
+                                       split=Split["TRAIN"])
 
-    test_loader = DataLoader(dataset=test_dataset,
-                             batch_size=None,
-                             num_workers=args.num_workers)
+    test_loader, num_classes = get_dataloader(args=args,
+                                              sources=args.test_sources,
+                                              episodic=True,
+                                              batch_size=args.test_batch_size,
+                                              split=Split["TRAIN"])
+    print(f"=> There are {num_classes} classes in the test datasets")
 
-    #  If you want to get the total number of classes (i.e from combined datasets)
-    num_classes = sum([len(d_spec.get_classes(split=Split["TRAIN"])) for d_spec in all_dataset_specs])
-    if not method.episodic_training:
-        loss_fn = all_losses[args.loss](args=args, num_classes=num_classes, reduction='none')
-
-    print(f"=> There are {num_classes} classes in the combined datasets")
-
-    # ============ Model and optim ================
-    model = all_models[args.arch](num_classes=num_classes).to(device)
-    load_checkpoint(model, model_path, type='best')
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum,
-                    weight_decay=args.weight_decay, nesterov=args.nesterov)
-    scheduler = MultiStepLR(optimizer,
-                            milestones=[int(.5 * args.train_iter),
-                                        int(.75 * args.train_iter)],
-                            gamma=args.gamma)
-
-    # ============ Prepare metrics ================
-    metrics: Dict[str, torch.tensor] = {"train_loss": torch.zeros(int(args.train_iter / args.train_freq)).type(torch.float32),
-                                        "val_acc": torch.zeros(int(args.train_iter / args.eval_freq)).type(torch.float32),
-                                        "val_loss": torch.zeros(int(args.train_iter / args.eval_freq)).type(torch.float32),
-                                        }
-    batch_time = AverageMeter()
-    train_loss = AverageMeter()
-    best_val_acc = 0.
+    # ============ Model ================
+    model = all_models[args.arch](num_classes=num_classes_tr).to(device)
+    load_checkpoint(model, model_dir, type='best')
 
     # ============ Training loop ============
-    model.train()
-    tqdm_bar = tqdm(train_loader, total=args.train_iter)
-    for i, data in enumerate(tqdm_bar):
-        if method.episodic_training:
+    model.eval()
+    print('Starting testing ...')
+    test_acc = 0.
+    test_loss = 0.
+    with torch.no_grad():
+        tqdm_bar = tqdm(test_loader, total=args.test_iter, ascii=True)
+        i = 0
+        for data in tqdm_bar:
             support, query, support_labels, query_labels = data
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
 
-            # Forward of the method
-            loss, _ = method(x_s=support,
-                             x_q=query,
-                             y_s=support_labels,
-                             y_q=query_labels,
-                             model=model)
-        else:
-            (input_, target) = data
-            input_, target = input_.to(device), target.to(device, non_blocking=True).long()
-
-            loss = loss_fn(input_, target, model)
-
-        # Perform optim
-        optimizer.zero_grad()
-        loss.mean().backward()
-        optimizer.step()
-        scheduler.step()
-
-        # Log metrics
-        train_loss.update(loss.mean().detach())
-
-        if i % args.train_freq:
-            print('Iteration: [{}/{}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                   i, args.train_iter, batch_time=batch_time,
-                   loss=train_loss))
-            for k in metrics:
-                if 'train' in k:
-                    metrics[k][int(i / args.train_freq)] = eval(k).avg
-
-        # ============ Evaluation ============
-        if i % args.eval_freq == 0:
-            print('Starting evaluation ...')
-            model.eval()
-            tqdm_bar = tqdm(val_loader, total=args.eval_iter)
-            with torch.no_grad():
-                val_acc = 0.
-                val_loss = 0.
-                for j, data in enumerate(tqdm_bar):
-                    support, query, support_labels, query_labels = data
-                    support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-                    query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-                    loss, pred_q = method(x_s=support,
-                                          x_q=query,
-                                          y_s=support_labels,
-                                          y_q=query_labels,
-                                          model=model)
-                    val_acc += (pred_q == query_labels).float().mean()
-                    if loss:
-                        val_loss += loss
-                    if j >= args.eval_iter:
-                        break
-                val_acc /= args.eval_iter
-                val_loss /= args.eval_iter
-
-                if val_acc > best_val_acc:
-                    best_val_acc = val_acc
-                    save_checkpoint(state={'iter': i,
-                                           'arch': args.arch,
-                                           'state_dict': model.state_dict(),
-                                           'best_acc': best_val_acc},
-                                    folder=model_dir)
-                print(f'Iteration: [{i}/{args.train_iter}] \t Val Prec@1 {val_acc:.3f} ({best_val_acc:.3f})\t')
-
-            for k in metrics:
-                if 'val' in k:
-                    metrics[k][int(i / args.eval_freq)] = eval(k)
-
-            for k, e in metrics.items():
-                path = os.path.join(model_dir, f"{k}.npy")
-                np.save(path, e.detach().cpu().numpy())
-
-            model.train()
-
-        if i >= args.train_iter:
-            break
+            # ============ Evaluation ============
+            loss, pred_q = method(x_s=support,
+                                  x_q=query,
+                                  y_s=support_labels,
+                                  y_q=query_labels,
+                                  model=model)
+            test_acc += (pred_q == query_labels).float().mean()
+            if loss:
+                test_loss += loss
+            if i % 10 == 0:
+                tqdm_bar.set_description(f'Test Prec@1 {test_acc / (i+1):.3f}  \
+                                           Test loss {test_loss / (i+1):.3f}',
+                                         )
+            if i >= args.test_iter:
+                break
+            i += 1
 
 
 if __name__ == '__main__':

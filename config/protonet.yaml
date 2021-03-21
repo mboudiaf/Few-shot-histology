@@ -1,2 +1,3 @@
 METHOD:
-  method: 'Protonet'
+  method: 'ProtoNet'
+  batch_size: 1

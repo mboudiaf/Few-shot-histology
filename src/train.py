@@ -3,7 +3,7 @@ import torch
 import argparse
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from typing import Dict, List
 from tqdm import tqdm
 import numpy as np
@@ -16,7 +16,7 @@ from models import __dict__ as all_models
 from methods import __dict__ as all_methods
 from losses import __dict__ as all_losses
 from utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
-                   save_checkpoint, get_model_dir, CfgNode
+                   save_checkpoint, get_model_dir
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,7 +34,8 @@ def parse_args() -> argparse.Namespace:
     return cfg
 
 
-def get_dataloader(sources: List[str],
+def get_dataloader(args: argparse.Namespace,
+                   sources: List[str],
                    episodic: bool,
                    batch_size: int,
                    split: Split):
@@ -84,35 +85,34 @@ def main(args):
     method = all_methods[args.method](args=args)
 
     # ============ Data loaders =========
-    train_loader, num_classes = get_dataloader(sources=args.train_sources,
+    train_loader, num_classes = get_dataloader(args=args,
+                                               sources=args.train_sources,
                                                episodic=method.episodic_training,
-                                               batch_size=None if method.episodic_training else args.batch_size,
+                                               batch_size=args.batch_size,
                                                split=Split["TRAIN"])
 
-    val_loader, _ = get_dataloader(sources=args.val_sources,
-                                   episodic=True,
-                                   batch_size=None,
-                                   split=Split["TRAIN"])
+    val_loader, num_classes_val = get_dataloader(args=args,
+                                                 sources=args.val_sources,
+                                                 episodic=True,
+                                                 batch_size=args.val_batch_size,
+                                                 split=Split["TRAIN"])
 
     #  If you want to get the total number of classes (i.e from combined datasets)
     if not method.episodic_training:
         loss_fn = all_losses[args.loss](args=args, num_classes=num_classes, reduction='none')
 
-    print(f"=> There are {num_classes} classes in the combined datasets")
+    print(f"=> There are {num_classes} classes in the train datasets")
+    print(f"=> There are {num_classes_val} classes in the validation datasets")
 
     # ============ Model and optim ================
     model = all_models[args.arch](num_classes=num_classes).to(device)
-    optimizer = SGD(model.parameters(), lr=args.lr, momentum=args.momentum,
-                    weight_decay=args.weight_decay, nesterov=args.nesterov)
-    scheduler = MultiStepLR(optimizer,
-                            milestones=[int(.5 * args.train_iter),
-                                        int(.75 * args.train_iter)],
-                            gamma=args.gamma)
+    optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    scheduler = None
 
     # ============ Prepare metrics ================
     metrics: Dict[str, torch.tensor] = {"train_loss": torch.zeros(int(args.train_iter / args.train_freq)).type(torch.float32),
-                                        "val_acc": torch.zeros(int(args.train_iter / args.eval_freq)).type(torch.float32),
-                                        "val_loss": torch.zeros(int(args.train_iter / args.eval_freq)).type(torch.float32),
+                                        "val_acc": torch.zeros(int(args.train_iter / args.val_freq)).type(torch.float32),
+                                        "val_loss": torch.zeros(int(args.train_iter / args.val_freq)).type(torch.float32),
                                         }
     batch_time = AverageMeter()
     train_loss = AverageMeter()
@@ -120,7 +120,7 @@ def main(args):
 
     # ============ Training loop ============
     model.train()
-    tqdm_bar = tqdm(train_loader, total=args.train_iter)
+    tqdm_bar = tqdm(train_loader, total=args.train_iter, ascii=True)
     for i, data in enumerate(tqdm_bar):
         t0 = time.time()
         if method.episodic_training:
@@ -128,47 +128,46 @@ def main(args):
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
 
-            # Forward of the method
             loss, _ = method(x_s=support,
                              x_q=query,
                              y_s=support_labels,
                              y_q=query_labels,
-                             model=model)
+                             model=model)  # [batch, q_shot]
         else:
             (input_, target) = data
             input_, target = input_.to(device), target.to(device, non_blocking=True).long()
-
             loss = loss_fn(input_, target, model)
 
         # Perform optim
         optimizer.zero_grad()
         loss.mean().backward()
         optimizer.step()
-        scheduler.step()
+        if scheduler:
+            scheduler.step()
 
         # Log metrics
-        train_loss.update(loss.mean().detach())
-        batch_time.update(time.time() - t0)
+        train_loss.update(loss.mean().detach(), i == 0)
+        batch_time.update(time.time() - t0, i == 0)
 
-        if i % args.train_freq:
-            print('Iteration: [{}/{}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'.format(
-                   i, args.train_iter, batch_time=batch_time,
-                   loss=train_loss))
+        if i % args.train_freq == 0:
+            tqdm_bar.set_description(
+                        'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) '
+                        'Loss {loss.val:.4f} ({loss.avg:.4f})'.format(
+                                batch_time=batch_time,
+                                loss=train_loss))
             for k in metrics:
                 if 'train' in k:
                     metrics[k][int(i / args.train_freq)] = eval(k).avg
 
         # ============ Evaluation ============
-        if i % args.eval_freq == 0:
+        if i % args.val_freq == 0:
             print('Starting evaluation ...')
             model.eval()
-            tqdm_bar = tqdm(val_loader, total=args.eval_iter)
+            tqdm_eval_bar = tqdm(val_loader, total=args.val_iter)
             with torch.no_grad():
                 val_acc = 0.
                 val_loss = 0.
-                for j, data in enumerate(tqdm_bar):
+                for j, data in enumerate(tqdm_eval_bar):
                     support, query, support_labels, query_labels = data
                     support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
                     query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
@@ -180,10 +179,10 @@ def main(args):
                     val_acc += (pred_q == query_labels).float().mean()
                     if loss is not None:
                         val_loss += loss.detach().mean()
-                    if j >= args.eval_iter:
+                    if j >= args.val_iter:
                         break
-                val_acc /= args.eval_iter
-                val_loss /= args.eval_iter
+                val_acc /= args.val_iter
+                val_loss /= args.val_iter
 
                 if val_acc > best_val_acc:
                     best_val_acc = val_acc
@@ -196,7 +195,7 @@ def main(args):
 
             for k in metrics:
                 if 'val' in k:
-                    metrics[k][int(i / args.eval_freq)] = eval(k)
+                    metrics[k][int(i / args.val_freq)] = eval(k)
 
             for k, e in metrics.items():
                 path = os.path.join(model_dir, f"{k}.npy")

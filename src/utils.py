@@ -33,11 +33,12 @@ class AverageMeter(object):
         self.sum = 0
         self.count = 0
 
-    def update(self, val, n=1):
+    def update(self, val, init, alpha=0.3):
         self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
+        if init:
+            self.avg = val
+        else:
+            self.avg = alpha * val + (1 - alpha) * self.avg
 
 
 def get_model_dir(args: argparse.Namespace):
