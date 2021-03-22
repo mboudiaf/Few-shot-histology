@@ -5,6 +5,112 @@ from ast import literal_eval
 from typing import List
 import torch
 import argparse
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
+import matplotlib
+
+cmaps = ['winter', 'hsv', 'Wistia', 'BuGn']
+
+
+def make_episode_visualization(args: argparse.Namespace,
+                               img_s: np.ndarray,
+                               img_q: np.ndarray,
+                               gt_s: np.ndarray,
+                               gt_q: np.ndarray,
+                               preds: np.ndarray,
+                               save_path: str,
+                               mean: List[float] = [0.485, 0.456, 0.406],
+                               std: List[float] = [0.229, 0.224, 0.225]):
+
+    max_support = args.max_s_visu
+    max_query = args.max_q_visu
+    # 0) Preliminary checks
+    assert len(img_s.shape) == 4, f"Support shape expected : Ks x 3 x H x W or Ks x H x W x 3. Currently: {img_s.shape}"
+    assert len(img_q.shape) == 4, f"Query shape expected : Kq x 3 x H x W or Kq x H x W x 3. Currently: {img_q.shape}"
+    assert len(preds.shape) == 2, f"Predictions shape expected : Kq x num_classes. Currently: {preds.shape}"
+    assert len(gt_s.shape) == 1,  f"Support GT shape expected : Ks. Currently: {gt_s.shape}"
+    assert len(gt_q.shape) == 1,  f"Query GT shape expected : Kq. Currently: {gt_q.shape}"
+    # assert img_s.shape[-1] == img_q.shape[-1] == 3, "Images need to be in the format H x W x 3"
+    if img_s.shape[1] == 3:
+        img_s = np.transpose(img_s, (0, 2, 3, 1))
+    if img_q.shape[1] == 3:
+        img_q = np.transpose(img_q, (0, 2, 3, 1))
+
+    assert img_s.shape[-3:-1] == img_q.shape[-3:-1], f"Support's resolution is {img_s.shape[-3:-1]} \
+                                                      Query's resolution is {img_q.shape[-3:-1]}"
+
+    if img_s.min() <= 0:
+        img_s *= std
+        img_s += mean
+
+    if img_q.min() <= 0:
+        img_q *= std
+        img_q += mean
+
+    Kq, num_classes = preds.shape
+    Ks = img_s.shape[0]
+
+    # Group samples by class
+    samples_s = {}
+    samples_q = {}
+    preds_q = {}
+    for class_ in np.unique(gt_s):
+        samples_s[class_] = img_s[gt_s == class_]
+        samples_q[class_] = img_q[gt_q == class_]
+        preds_q[class_] = preds[gt_q == class_]
+    # Create Grid
+    max_s = min(max_support, np.max([v.shape[0] for v in samples_s.values()]))
+    max_q = min(max_query, np.max([v.shape[0] for v in samples_q.values()]))
+    n_rows = max_s + max_q
+    n_columns = num_classes
+    fig = plt.figure(figsize=(18, 18), dpi=300)
+    grid = ImageGrid(fig, 111,
+                     nrows_ncols=(n_rows, n_columns),
+                     axes_pad=(0.4, 0.3),
+                     direction='row',
+                     )
+
+    # 1) visualize the support set
+    for i in range(max_s):
+        for j in range(n_columns):
+            ax = grid[n_columns*i + j]
+            if i < len(samples_s[j]):
+                img = samples_s[j][i]
+                make_plot(ax, img)
+            ax.axis('off')
+            if i == 0:
+                ax.set_title(f'Class {j}', size=20)
+
+    # 1) visualize the query set
+    for i in range(max_s, max_s + max_q):
+        for j in range(n_columns):
+            ax = grid[n_columns*i + j]
+            if i - max_s < len(samples_q[j]):
+                img = samples_q[j][i - max_s]
+                make_plot(ax, img, preds_q[j][i - max_s])
+            ax.axis('off')
+    fig.suptitle(args.method, size=32, weight='bold', y=0.97)
+    fig.text(0.0, 0.66, 'Support', rotation=90, size=45)
+    fig.text(0.0, 0.31, 'Query', rotation=90, size=45)
+    # fig.text(0.06, 0.32, '{', size=500, weight=0.)
+    # fig.tight_layout()
+    fig.savefig(save_path)
+    fig.clf()
+    print(f"Figure saved at {save_path}")
+
+
+def make_plot(ax: matplotlib.axes.Axes,
+              img: np.ndarray,
+              preds: np.ndarray = None):
+
+    ax.imshow(img)
+    if preds is not None:
+        title = ['{:.2f}'.format(p) for p in preds]
+        title[np.argmax(preds)] = r'$\mathbf{{{}}}$'.format(title[np.argmax(preds)])
+        title = '/'.join(title)
+        # print(title)
+        ax.set_title(title, size=12)
 
 
 def load_checkpoint(model, model_path, type='best'):
@@ -33,7 +139,7 @@ class AverageMeter(object):
         self.sum = 0
         self.count = 0
 
-    def update(self, val, init, alpha=0.3):
+    def update(self, val, init, alpha=0.2):
         self.val = val
         if init:
             self.avg = val

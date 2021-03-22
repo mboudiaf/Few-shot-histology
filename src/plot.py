@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--figsize', type=list, default=[10, 10])
     parser.add_argument('--dpi', type=list, default=200,
                         help='Dots per inch when saving the fig')
-    parser.add_argument('--max_col', type=int, default=3,
+    parser.add_argument('--max_col', type=int, default=1,
                         help='Maximum number of columns for legend')
 
     args = parser.parse_args()

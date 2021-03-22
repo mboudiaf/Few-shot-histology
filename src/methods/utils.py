@@ -31,22 +31,18 @@ def compute_centroids(z_s: torch.tensor,
     return centroids
 
 
-def extract_features(x_s: tensor, x_q: tensor, model: nn.Module):
+def extract_features(x: tensor, model: nn.Module):
     """
     Extract features from support and query set using the provided model
         args:
             x_s : torch.Tensor of size [batch, s_shot, c, h, w]
-            x_q : torch.Tensor of size [batch, q_shot, c, h, w]
         returns
             z_s : torch.Tensor of shape [batch, s_shot, d]
             z_s : torch.Tensor of shape [batch, q_shot, d]
     """
-    batch, s_shot = x_s.size()[:2]
-    q_shot = x_q.size(1)
-    feat_dim = x_s.size()[-3:]
-    z_s = model.extract_features(x_s.view(batch * s_shot, *feat_dim))
-    z_q = model.extract_features(x_q.view(batch * q_shot, *feat_dim))
-    z_s = z_s.view(batch, s_shot, -1)  # [batch, s_shot, d]
-    z_q = z_q.view(batch, q_shot, -1)  # [batch, q_shot, d]
+    batch, shot = x.size()[:2]
+    feat_dim = x.size()[-3:]
+    z = model.extract_features(x.view(batch * shot, *feat_dim))
+    z = z.view(batch, shot, -1)  # [batch, s_shot, d]
 
-    return z_s, z_q
+    return z

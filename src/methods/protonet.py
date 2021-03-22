@@ -29,7 +29,13 @@ class ProtoNet(FSmethod):
             y_q : torch.Tensor of size [q_shot]
         """
         num_classes = y_s.unique().size(0)
-        z_s, z_q = extract_features(x_s, x_q, model)
+        if not self.training:
+            with torch.no_grad():
+                z_s = extract_features(x_s, model)
+                z_q = extract_features(x_q, model)
+        else:
+            z_s = extract_features(x_s, model)
+            z_q = extract_features(x_q, model)
 
         centroids = compute_centroids(z_s, y_s)  # [batch, num_class, d]
 
@@ -41,6 +47,6 @@ class ProtoNet(FSmethod):
         one_hot_q = get_one_hot(y_q, num_classes)  # [batch, q_shot, num_class]
         ce = - (one_hot_q * log_probas).sum(-1)  # [batch, q_shot, num_class]
 
-        preds_q = l2_distance.detach().argmin(-1)
+        preds_q = log_probas.detach().exp()
 
         return ce, preds_q

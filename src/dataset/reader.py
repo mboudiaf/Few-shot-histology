@@ -19,6 +19,7 @@ class Reader(object):
     def __init__(self,
                  dataset_spec: Union[BDS, DS],
                  split: Split,
+                 shuffle_queue_size: int,
                  offset: int):
         """Initializes a Reader from a source.
 
@@ -28,12 +29,12 @@ class Reader(object):
           dataset_spec: DatasetSpecification, dataset specification.
           split: A learning_spec.Split object identifying the source split.
         """
-        self.split = split
         self.dataset_spec = dataset_spec
         self.offset = offset
+        self.shuffle_queue_size = shuffle_queue_size
 
         self.base_path = self.dataset_spec.path
-        self.class_set = self.dataset_spec.get_classes(self.split)
+        self.class_set = self.dataset_spec.get_classes(split)
         self.num_classes = len(self.class_set)
 
     def construct_class_datasets(self):
@@ -65,7 +66,8 @@ class Reader(object):
             dataset = TFRecordDataset(data_path=filename,
                                       index_path=index_path,
                                       description=description,
-                                      transform=decode_fn)
+                                      transform=decode_fn,
+                                      shuffle_queue_size=self.shuffle_queue_size)
 
             class_datasets.append(dataset)
 

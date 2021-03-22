@@ -33,12 +33,13 @@ def make_episode_pipeline(dataset_spec_list: List[Union[BDS, DS]],
     episodic_dataset_list = []
     for i in range(len(dataset_spec_list)):
         episode_reader = reader.Reader(dataset_spec=dataset_spec_list[i],
-                                       split=split,
+                                       split=Split["TRAIN"],
+                                       shuffle_queue_size=data_config.shuffle_queue_size,
                                        offset=0)
         class_datasets = episode_reader.construct_class_datasets()
         sampler = sampling.EpisodeDescriptionSampler(
             dataset_spec=episode_reader.dataset_spec,
-            split=split,
+            split=Split["TRAIN"],
             episode_descr_config=episode_descr_config,
             use_bilevel_hierarchy=episode_descr_config.use_bilevel_ontology_list[i])
         transforms = get_transforms(data_config, split)
@@ -68,7 +69,8 @@ def make_batch_pipeline(dataset_spec_list: List[Union[BDS, DS]],
     dataset_list = []
     for dataset_spec in dataset_spec_list:
         batch_reader = reader.Reader(dataset_spec=dataset_spec,
-                                     split=split,
+                                     split=Split["TRAIN"],
+                                     shuffle_queue_size=data_config.shuffle_queue_size,
                                      offset=offset)
 
         class_datasets = batch_reader.construct_class_datasets()

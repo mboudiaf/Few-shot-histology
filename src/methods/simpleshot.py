@@ -28,13 +28,18 @@ class SimpleShot(FSmethod):
             y_s : torch.Tensor of shape [s_shot]
             y_q : torch.Tensor of shape [q_shot]
         """
-
-        z_s, z_q = extract_features(x_s, x_q, model)
+        if not self.training:
+            with torch.no_grad():
+                z_s = extract_features(x_s, model)
+                z_q = extract_features(x_q, model)
+        else:
+            z_s = extract_features(x_s, model)
+            z_q = extract_features(x_q, model)
         centroids = compute_centroids(z_s, y_s)  # [batch, num_class, d]
 
         l2_distance = (- 2 * z_q.matmul(centroids.transpose(1, 2)) \
                         + (centroids**2).sum(2).unsqueeze(1)  # noqa: E127
                         + (z_q**2).sum(2).unsqueeze(-1))  # [batch, q_shot, num_class]
 
-        preds_q = l2_distance.argmin(-1)
+        preds_q = (-l2_distance).detach().softmax(-1)
         return None, preds_q

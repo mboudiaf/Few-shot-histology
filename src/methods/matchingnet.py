@@ -30,13 +30,19 @@ class MatchingNet(FSmethod):
             y_s : torch.Tensor of shape [batch, s_shot]
             y_q : torch.Tensor of shape [batch, q_shot]
         """
-        z_s, z_q = extract_features(x_s, x_q, model)
+        if not self.training:
+            with torch.no_grad():
+                z_s = extract_features(x_s, model)
+                z_q = extract_features(x_q, model)
+        else:
+            z_s = extract_features(x_s, model)
+            z_q = extract_features(x_q, model)
 
         logits = self.matching_log_probas(z_s,
                                           y_s,
                                           z_q)  # [batch, num_classes, q_shot]
         loss = F.nll_loss(logits, y_q)
-        preds = logits.detach().argmax(1)
+        preds = logits.detach().permute(0, 2, 1).softmax(-1)
         return loss, preds
 
     def pairwise_cosine_similarity(self, z_s1, z_s2):
