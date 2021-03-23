@@ -4,18 +4,19 @@ DATA:
   train_sources: ['crc-tp'] # Which dataset to use
   val_sources: ['lc25000'] # Which dataset to use
   test_sources: ['breakhis'] # Which dataset to use
-  train_transforms: ['random_resized_crop', 'normalize']
+  train_transforms: ['random_resized_crop', 'random_flip', 'normalize']
   test_transforms: ['resize', 'center_crop', 'normalize'] #Transforms applied to training data
   data_path: '/ssd/dataset/histology/converted/'
   ckpt_path: 'checkpoints'
   shuffle_queue_size: 500
 
 TRAINING:
+  manual_seed: 2021
   arch: 'resnet18'
   batch_size: 100
   num_workers: 4
   train_freq: 50
-  train_iter: 100000
+  train_iter: 75000
   loss: '_CrossEntropy'
   focal_gamma: 3
   label_smoothing: 0.1
@@ -43,7 +44,7 @@ OPTIM:
   gamma: 0.1
 
 VISU:
-  visu: True
+  visu: False
   max_s_visu: 2
   max_q_visu: 3
 

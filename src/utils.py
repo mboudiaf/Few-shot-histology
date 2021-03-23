@@ -151,15 +151,29 @@ def get_model_dir(args: argparse.Namespace):
     train = "train={}".format('_'.join(args.train_sources))
     valid = "valid={}".format('_'.join(args.val_sources))
     return os.path.join(args.ckpt_path,
-                        args.method,
+                        f'method={args.method}',
                         train,
                         valid,
-                        args.arch)
+                        f'arch={args.arch}',
+                        f'seed={args.manual_seed}')
 
 
 def save_checkpoint(state, folder, filename='model_best.pth.tar'):
     os.makedirs(folder, exist_ok=True)
     torch.save(state, os.path.join(folder, filename))
+
+
+def compute_confidence_interval(data, axis=0):
+    """
+    Compute 95% confidence interval
+    :param data: An array of mean accuracy (or mAP) across a number of sampled episodes.
+    :return: the 95% confidence interval for this data.
+    """
+    a = 1.0 * np.array(data)
+    m = np.mean(a, axis=axis)
+    std = np.std(a, axis=axis)
+    pm = 1.96 * (std / np.sqrt(a.shape[axis]))
+    return m, pm
 
 
 class CfgNode(dict):

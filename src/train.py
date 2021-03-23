@@ -8,7 +8,9 @@ from typing import Dict, List
 from tqdm import tqdm
 import numpy as np
 import time
+import torch.backends.cudnn as cudnn
 import matplotlib.pyplot as plt
+import random
 from .dataset.utils import Split
 from .dataset import config as config_lib
 from .dataset import dataset_spec as dataset_spec_lib
@@ -75,6 +77,15 @@ def get_dataloader(args: argparse.Namespace,
 
 
 def main(args):
+
+    if args.manual_seed is not None:
+        cudnn.benchmark = False
+        cudnn.deterministic = True
+        torch.cuda.manual_seed(args.manual_seed)
+        np.random.seed(args.manual_seed)
+        torch.manual_seed(args.manual_seed)
+        torch.cuda.manual_seed_all(args.manual_seed)
+        random.seed(args.manual_seed)
 
     # ============ Device ================
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -236,8 +247,8 @@ def main(args):
                     metrics[k][int(i / args.val_freq)] = eval(k)
 
             for k, e in metrics.items():
-                path = os.path.join(model_dir, f"{k}.npy")
-                np.save(path, e.detach().cpu().numpy())
+                metrics_path = os.path.join(model_dir, f"{k}.npy")
+                np.save(metrics_path, e.detach().cpu().numpy())
             model.train()
             method.train()
 
@@ -288,8 +299,8 @@ def main(args):
                     metrics[k][int(i / args.val_freq)] = eval(k)
 
             for k, e in metrics.items():
-                path = os.path.join(model_dir, f"{k}.npy")
-                np.save(path, e.detach().cpu().numpy())
+                metrics_path = os.path.join(model_dir, f"{k}.npy")
+                np.save(metrics_path, e.detach().cpu().numpy())
             model.train()
             method.train()
 
