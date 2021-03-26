@@ -34,6 +34,14 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
+abrv2name = {'val_loss': 'Validation loss',
+             'val_acc': 'Validation accuracy',
+             'test_loss': 'Test loss',
+             'test_acc': 'Test accuracy',
+             'train_loss': 'Training loss',
+             'train_acc': 'Training accuracy'}
+
+
 def main(args: argparse.Namespace) -> None:
     plt.rc('font',
            size=args.fontsize,
@@ -54,7 +62,6 @@ def main(args: argparse.Namespace) -> None:
         arch = [part.split('=')[1] for part in parts if 'arch' in part][0]
         filenames_dic[metric][method][arch][seed] = path
 
-    print(list(filenames_dic.keys()))
     # Do one plot per metric
     for metric in filenames_dic:
         fig = plt.Figure(args.figsize)
@@ -64,13 +71,17 @@ def main(args: argparse.Namespace) -> None:
                 all_y = np.concatenate(
                             [np.expand_dims(np.load(path), 0) \
                              for path in filenames_dic[metric][method][arch].values()], 0)  # [num_seeds, num_epochs]
-
                 mean, conf_interv = compute_confidence_interval(all_y, axis=0)
+
+                valid = mean > 0
+                mean = mean[valid]
+                conf_interv = conf_interv[valid]
 
                 n_epochs = mean.shape[0]
                 x = np.linspace(0, n_epochs - 1, (n_epochs))
 
                 label = f'{method} ({arch})'
+                ax.set_title(abrv2name[metric], size=32, weight='bold', y=1.1)
                 ax.plot(x, mean, label=label, color=color, linestyle=style)
                 ax.fill_between(x, mean-conf_interv, mean+conf_interv, color=color, alpha=0.3)
 

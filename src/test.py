@@ -3,20 +3,25 @@ import torch
 import argparse
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import MultiStepLR
-from typing import Dict
+from torch.optim import SGD, Adam
+from typing import Dict, List
 from tqdm import tqdm
 import numpy as np
-from dataset.utils import Split
-import dataset.config as config_lib
-import dataset.dataset_spec as dataset_spec_lib
-import dataset.pipeline as pipeline
-from models import __dict__ as all_models
-from methods import __dict__ as all_methods
-from losses import __dict__ as all_losses
-from utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
-                   save_checkpoint, get_model_dir, load_checkpoint
-from train import get_dataloader
-
+import time
+import torch.backends.cudnn as cudnn
+import matplotlib.pyplot as plt
+import random
+from .dataset.utils import Split
+from .dataset import config as config_lib
+from .dataset import dataset_spec as dataset_spec_lib
+from .dataset import pipeline
+from .models import __dict__ as all_models
+from .methods import __dict__ as all_methods
+from .losses import __dict__ as all_losses
+from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
+                   save_checkpoint, get_model_dir, make_episode_visualization, \
+                   load_checkpoint
+from .train import get_dataloader
 
 def parse_args() -> argparse.Namespace:
 
@@ -57,7 +62,7 @@ def main(args):
     print(f"=> There are {num_classes} classes in the test datasets")
 
     # ============ Model ================
-    model = all_models[args.arch](num_classes=num_classes_tr).to(device)
+    model = all_models[args.arch](num_classes=num_classes_tr if args.method != 'MAML' else args.num_ways).to(device)
     load_checkpoint(model, model_dir, type='best')
 
     # ============ Training loop ============
@@ -74,12 +79,25 @@ def main(args):
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
 
             # ============ Evaluation ============
-            loss, pred_q = method(x_s=support,
-                                  x_q=query,
-                                  y_s=support_labels,
-                                  y_q=query_labels,
-                                  model=model)
-            test_acc += (pred_q == query_labels).float().mean()
+            loss, soft_preds_q = method(x_s=support,
+                                        x_q=query,
+                                        y_s=support_labels,
+                                        y_q=query_labels,
+                                        model=model)
+            if args.visu and i % 100 == 0:
+                task_id = 0
+                root = os.path.join(model_dir, 'visu', 'test')
+                os.makedirs(root, exist_ok=True)
+                save_path = os.path.join(root, f'{i}.png')
+                make_episode_visualization(
+                           args,
+                           support[task_id].cpu().numpy(),
+                           query[task_id].cpu().numpy(),
+                           support_labels[task_id].cpu().numpy(),
+                           query_labels[task_id].cpu().numpy(),
+                           soft_preds_q[task_id].cpu().numpy(),
+                           save_path)
+            test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
             if loss:
                 test_loss += loss
             if i % 10 == 0:

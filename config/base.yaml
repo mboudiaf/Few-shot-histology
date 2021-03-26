@@ -4,7 +4,7 @@ DATA:
   train_sources: ['crc-tp'] # Which dataset to use
   val_sources: ['lc25000'] # Which dataset to use
   test_sources: ['breakhis'] # Which dataset to use
-  train_transforms: ['random_resized_crop', 'random_flip', 'normalize']
+  train_transforms: ['random_resized_crop', 'random_flip', 'jitter', 'normalize']
   test_transforms: ['resize', 'center_crop', 'normalize'] #Transforms applied to training data
   data_path: '/ssd/dataset/histology/converted/'
   ckpt_path: 'checkpoints'

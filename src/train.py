@@ -144,7 +144,11 @@ def main(args):
     # ============ Training loop ============
     model.train()
     tqdm_bar = tqdm(train_loader, total=args.train_iter, ascii=True)
-    for i, data in enumerate(tqdm_bar):
+    i = 0
+    for data in tqdm_bar:
+
+        if i >= args.train_iter:
+            break
         model.zero_grad()
         t0 = time.time()
         if method.episodic_training:
@@ -304,8 +308,7 @@ def main(args):
             model.train()
             method.train()
 
-        if i >= args.train_iter:
-            break
+        i += 1
 
 
 if __name__ == '__main__':

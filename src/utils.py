@@ -94,7 +94,7 @@ def make_episode_visualization(args: argparse.Namespace,
     fig.text(0.0, 0.66, 'Support', rotation=90, size=45)
     fig.text(0.0, 0.31, 'Query', rotation=90, size=45)
     # fig.text(0.06, 0.32, '{', size=500, weight=0.)
-    # fig.tight_layout()
+    fig.tight_layout()
     fig.savefig(save_path)
     fig.clf()
     print(f"Figure saved at {save_path}")
@@ -151,9 +151,9 @@ def get_model_dir(args: argparse.Namespace):
     train = "train={}".format('_'.join(args.train_sources))
     valid = "valid={}".format('_'.join(args.val_sources))
     return os.path.join(args.ckpt_path,
-                        f'method={args.method}',
                         train,
                         valid,
+                        f'method={args.method}',
                         f'arch={args.arch}',
                         f'seed={args.manual_seed}')
 
