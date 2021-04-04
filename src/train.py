@@ -15,6 +15,7 @@ from .dataset.utils import Split
 from .dataset import config as config_lib
 from .dataset import dataset_spec as dataset_spec_lib
 from .dataset import pipeline
+from .dataset.pipeline import worker_init_fn_
 from .models import __dict__ as all_models
 from .methods import __dict__ as all_methods
 from .losses import __dict__ as all_losses
@@ -71,25 +72,27 @@ def get_dataloader(args: argparse.Namespace,
 
     loader = DataLoader(dataset=dataset,
                         batch_size=batch_size,
-                        num_workers=args.num_workers)
+                        num_workers=args.num_workers,
+                        worker_init_fn=worker_init_fn_)
     num_classes = sum([len(d_spec.get_classes(split=Split["TRAIN"])) for d_spec in all_dataset_specs])
     return loader, num_classes
 
 
 def main(args):
 
-    if args.manual_seed is not None:
+    if args.seeds:
+        args.seeds = args.seeds[0]
         cudnn.benchmark = False
         cudnn.deterministic = True
-        torch.cuda.manual_seed(args.manual_seed)
-        np.random.seed(args.manual_seed)
-        torch.manual_seed(args.manual_seed)
-        torch.cuda.manual_seed_all(args.manual_seed)
-        random.seed(args.manual_seed)
+        torch.cuda.manual_seed(args.seeds)
+        np.random.seed(args.seeds)
+        torch.manual_seed(args.seeds)
+        torch.cuda.manual_seed_all(args.seeds)
+        random.seed(args.seeds)
 
     # ============ Device ================
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_dir = get_model_dir(args)
+    model_dir = get_model_dir(args, args.seeds)
 
     # ============ Data spec ================
 
@@ -121,7 +124,7 @@ def main(args):
 
     print(f"=> There are {num_classes} classes in the train datasets")
     print(f"=> There are {num_classes_val} classes in the validation datasets")
-    print(f"=> There are {num_classes_test} classes in the validation datasets")
+    print(f"=> There are {num_classes_test} classes in the test datasets")
 
     # ============ Model and optim ================
     model = all_models[args.arch](num_classes=num_classes if args.method != 'MAML' else args.num_ways).to(device)
@@ -149,6 +152,8 @@ def main(args):
 
         if i >= args.train_iter:
             break
+
+        # ============ Make a training iteration ============
         model.zero_grad()
         t0 = time.time()
         if method.episodic_training:
@@ -197,110 +202,11 @@ def main(args):
 
         # ============ Evaluation ============
         if i % args.val_freq == 0:
-            print('Starting validation ...')
-            model.eval()
-            method.eval()
-
-            tqdm_eval_bar = tqdm(val_loader, total=args.val_iter, ascii=True)
-            val_acc = 0.
-            val_loss = 0.
-            for j, data in enumerate(tqdm_eval_bar):
-                support, query, support_labels, query_labels = data
-                support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-                query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-                loss, soft_preds_q = method(x_s=support,
-                                            x_q=query,
-                                            y_s=support_labels,
-                                            y_q=query_labels,
-                                            model=model)
-
-                if args.visu and j == 0:
-                    task_id = 0
-                    root = os.path.join(model_dir, 'visu', 'valid')
-                    os.makedirs(root, exist_ok=True)
-                    save_path = os.path.join(root, f'{i}.png')
-                    make_episode_visualization(
-                               args,
-                               support[task_id].cpu().numpy(),
-                               query[task_id].cpu().numpy(),
-                               support_labels[task_id].cpu().numpy(),
-                               query_labels[task_id].cpu().numpy(),
-                               soft_preds_q[task_id].cpu().numpy(),
-                               save_path)
-                val_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
-                tqdm_eval_bar.set_description(
-                    f'Val Prec@1 {val_acc/(j+1):.3f})')
-                if loss is not None:
-                    val_loss += loss.detach().mean()
-                if j >= args.val_iter:
-                    break
-            val_acc /= args.val_iter
-            val_loss /= args.val_iter
-
-            if val_acc > best_val_acc:
-                best_val_acc = val_acc
-                save_checkpoint(state={'iter': i,
-                                       'arch': args.arch,
-                                       'state_dict': model.state_dict(),
-                                       'best_acc': best_val_acc},
-                                folder=model_dir)
-            print(f'Iteration: [{i}/{args.train_iter}] \t Val Prec@1 {val_acc:.3f} ({best_val_acc:.3f})\t')
-
-            for k in metrics:
-                if 'val' in k:
-                    metrics[k][int(i / args.val_freq)] = eval(k)
-
-            for k, e in metrics.items():
-                metrics_path = os.path.join(model_dir, f"{k}.npy")
-                np.save(metrics_path, e.detach().cpu().numpy())
-            model.train()
-            method.train()
+            evaluate(i, val_loader, model, method, model_dir, metrics, best_val_acc, device)
 
         # ============ Testing ============
         if i % args.val_freq == 0:
-            print('Starting testing ...')
-            model.eval()
-            method.eval()
-            tqdm_test_bar = tqdm(test_loader, total=args.val_iter, ascii=True)
-            test_acc = 0.
-            test_loss = 0.
-            for j, data in enumerate(tqdm_test_bar):
-                support, query, support_labels, query_labels = data
-                support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-                query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-                loss, soft_preds_q = method(x_s=support,
-                                            x_q=query,
-                                            y_s=support_labels,
-                                            y_q=query_labels,
-                                            model=model)
-                if args.visu and j == 0:
-                    task_id = 0
-                    root = os.path.join(model_dir, 'visu', 'test')
-                    os.makedirs(root, exist_ok=True)
-                    save_path = os.path.join(root, f'{i}.png')
-                    make_episode_visualization(
-                               args,
-                               support[task_id].cpu().numpy(),
-                               query[task_id].cpu().numpy(),
-                               support_labels[task_id].cpu().numpy(),
-                               query_labels[task_id].cpu().numpy(),
-                               soft_preds_q[task_id].cpu().numpy(),
-                               save_path)
-                test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
-                tqdm_test_bar.set_description(
-                    f'Test Prec@1 {test_acc/(j+1):.3f})')
-                if loss is not None:
-                    test_loss += loss.detach().mean()
-                if j >= args.val_iter:
-                    break
-            test_acc /= args.val_iter
-            test_loss /= args.val_iter
-
-            print(f'Iteration: [{i}/{args.train_iter}] \t Test Prec@1 {test_acc:.3f} ')
-
-            for k in metrics:
-                if 'test' in k:
-                    metrics[k][int(i / args.val_freq)] = eval(k)
+            test(i, test_loader, model, method, model_dir, metrics, best_val_acc, device)
 
             for k, e in metrics.items():
                 metrics_path = os.path.join(model_dir, f"{k}.npy")
@@ -309,6 +215,114 @@ def main(args):
             method.train()
 
         i += 1
+
+
+def test(i, loader, model, method, model_dir, metrics, best_val_acc, device):
+    print('Starting testing ...')
+    model.eval()
+    method.eval()
+    tqdm_test_bar = tqdm(loader, total=args.val_iter, ascii=True)
+    test_acc = 0.
+    test_loss = 0.
+    for j, data in enumerate(tqdm_test_bar):
+        support, query, support_labels, query_labels = data
+        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
+        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
+        loss, soft_preds_q = method(x_s=support,
+                                    x_q=query,
+                                    y_s=support_labels,
+                                    y_q=query_labels,
+                                    model=model)
+        if args.visu and j == 0:
+            task_id = 0
+            root = os.path.join(model_dir, 'visu', 'test')
+            os.makedirs(root, exist_ok=True)
+            save_path = os.path.join(root, f'{i}.png')
+            make_episode_visualization(
+                       args,
+                       support[task_id].cpu().numpy(),
+                       query[task_id].cpu().numpy(),
+                       support_labels[task_id].cpu().numpy(),
+                       query_labels[task_id].cpu().numpy(),
+                       soft_preds_q[task_id].cpu().numpy(),
+                       save_path)
+        test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
+        tqdm_test_bar.set_description(
+            f'Test Prec@1 {test_acc/(j+1):.3f})')
+        if loss is not None:
+            test_loss += loss.detach().mean()
+        if j >= args.val_iter:
+            break
+    test_acc /= args.val_iter
+    test_loss /= args.val_iter
+
+    print(f'Iteration: [{i}/{args.train_iter}] \t Test Prec@1 {test_acc:.3f} ')
+
+    for k in metrics:
+        if 'test' in k:
+            metrics[k][int(i / args.val_freq)] = eval(k)
+
+
+def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device):
+    print('Starting validation ...')
+    model.eval()
+    method.eval()
+
+    tqdm_eval_bar = tqdm(loader, total=args.val_iter, ascii=True)
+    val_acc = 0.
+    val_loss = 0.
+    for j, data in enumerate(tqdm_eval_bar):
+        support, query, support_labels, query_labels = data
+        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
+        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
+        loss, soft_preds_q = method(x_s=support,
+                                    x_q=query,
+                                    y_s=support_labels,
+                                    y_q=query_labels,
+                                    model=model)
+
+        if args.visu and j == 0:
+            task_id = 0
+            root = os.path.join(model_dir, 'visu', 'valid')
+            os.makedirs(root, exist_ok=True)
+            save_path = os.path.join(root, f'{i}.png')
+            make_episode_visualization(
+                       args,
+                       support[task_id].cpu().numpy(),
+                       query[task_id].cpu().numpy(),
+                       support_labels[task_id].cpu().numpy(),
+                       query_labels[task_id].cpu().numpy(),
+                       soft_preds_q[task_id].cpu().numpy(),
+                       save_path)
+        val_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
+        tqdm_eval_bar.set_description(
+            f'Val Prec@1 {val_acc/(j+1):.3f})')
+        if loss is not None:
+            val_loss += loss.detach().mean()
+        if j >= args.val_iter:
+            break
+    val_acc /= args.val_iter
+    val_loss /= args.val_iter
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        save_checkpoint(state={'iter': i,
+                               'arch': args.arch,
+                               'state_dict': model.state_dict(),
+                               'best_acc': best_val_acc},
+                        folder=model_dir)
+    print(f'Iteration: [{i}/{args.train_iter}] \t Val Prec@1 {val_acc:.3f} ({best_val_acc:.3f})\t')
+    return best_val_acc
+
+    for k in metrics:
+        if 'val' in k:
+            metrics[k][int(i / args.val_freq)] = eval(k)
+
+    for k, e in metrics.items():
+        metrics_path = os.path.join(model_dir, f"{k}.npy")
+        np.save(metrics_path, e.detach().cpu().numpy())
+    model.train()
+    method.train()
 
 
 if __name__ == '__main__':

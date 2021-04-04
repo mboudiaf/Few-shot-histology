@@ -1,17 +1,16 @@
 from absl import logging
 from typing import Union, List, Tuple
 import numpy as np
+from numpy.random import RandomState
 from . import dataset_spec as dataset_spec_lib
 from . config import EpisodeDescriptionConfig
 from .dataset_spec import BiLevelDatasetSpecification as BDS
 from .dataset_spec import DatasetSpecification as DS
 from .utils import Split
 
-# Module-level random number generator. Initialized randomly, can be seeded.
-RNG = np.random.RandomState(seed=None)
 
-
-def sample_num_ways_uniformly(num_classes: int,
+def sample_num_ways_uniformly(random_gen: RandomState,
+                              num_classes: int,
                               min_ways: int,
                               max_ways: int):
     """Samples a number of ways for an episode uniformly and at random.
@@ -28,10 +27,11 @@ def sample_num_ways_uniformly(num_classes: int,
       num_ways: int, number of ways for the episode.
     """
     max_ways = min(max_ways, num_classes)
-    return RNG.randint(low=min_ways, high=max_ways + 1)
+    return random_gen.randint(low=min_ways, high=max_ways + 1)
 
 
-def sample_class_ids_uniformly(num_ways: int,
+def sample_class_ids_uniformly(random_gen: RandomState,
+                               num_ways: int,
                                rel_classes: List[int]):
     """Samples the (relative) class IDs for the episode.
 
@@ -42,7 +42,7 @@ def sample_class_ids_uniformly(num_ways: int,
     Returns:
       class_ids: np.array, class IDs for the episode, with values in rel_classes.
     """
-    return RNG.choice(rel_classes, min(num_ways, len(rel_classes)), replace=False)
+    return random_gen.choice(rel_classes, min(num_ways, len(rel_classes)), replace=False)
 
 
 def compute_num_query(images_per_class: np.ndarray,
@@ -83,7 +83,8 @@ def compute_num_query(images_per_class: np.ndarray,
     return np.minimum(max_num_query, images_per_class.min() - max_support)
 
 
-def sample_support_set_size(num_remaining_per_class: np.ndarray,
+def sample_support_set_size(random_gen: RandomState,
+                            num_remaining_per_class: np.ndarray,
                             max_support_size_contrib_per_class: int,
                             max_support_set_size: int):
     """Samples the size of the support set in the episode.
@@ -110,7 +111,7 @@ def sample_support_set_size(num_remaining_per_class: np.ndarray,
     if max_support_set_size < len(num_remaining_per_class):
         raise ValueError('max_support_set_size is too small to have at least one '
                          'support example per class.')
-    beta = RNG.uniform()
+    beta = random_gen.uniform()
     support_size_contributions = np.minimum(max_support_size_contrib_per_class,
                                             num_remaining_per_class)
     return np.minimum(
@@ -122,7 +123,8 @@ def sample_support_set_size(num_remaining_per_class: np.ndarray,
         max_support_set_size)
 
 
-def sample_num_support_per_class(images_per_class: np.ndarray,
+def sample_num_support_per_class(random_gen: RandomState,
+                                 images_per_class: np.ndarray,
                                  num_remaining_per_class: np.ndarray,
                                  support_set_size: int,
                                  min_log_weight: float,
@@ -159,7 +161,7 @@ def sample_num_support_per_class(images_per_class: np.ndarray,
     remaining_support_set_size = support_set_size - len(num_remaining_per_class)  # noqa: E111
 
     unnormalized_proportions = images_per_class * np.exp(  # noqa: E111
-        RNG.uniform(min_log_weight, max_log_weight, size=images_per_class.shape))
+        random_gen.uniform(min_log_weight, max_log_weight, size=images_per_class.shape))
     support_set_proportions = (  # noqa: E111
         unnormalized_proportions / unnormalized_proportions.sum())
 
@@ -267,7 +269,7 @@ class EpisodeDescriptionSampler(object):
                         (i, self.dataset_spec.classes_per_superclass[i], self.min_ways))
                 self.superclass_set.append(i)
 
-    def sample_class_ids(self):
+    def sample_class_ids(self, random_gen: RandomState,):
         """Returns the (relative) class IDs for an episode.
 
         If self.use_dag_hierarchy, it samples them according to a procedure
@@ -277,11 +279,11 @@ class EpisodeDescriptionSampler(object):
         """
         prob = [1.0, 0.0]
 
-        if self.use_bilevel_hierarchy and RNG.choice([True, False], p=prob):
+        if self.use_bilevel_hierarchy and random_gen.choice([True, False], p=prob):
             # First sample a coarse category uniformly. Then randomly sample the way
             # uniformly, but taking care not to sample more than the number of classes
             # of the chosen supercategory.
-            episode_superclass = RNG.choice(self.superclass_set, 1)[0]  # noqa: E111
+            episode_superclass = random_gen.choice(self.superclass_set, 1)[0]  # noqa: E111
             num_superclass_classes = self.dataset_spec.classes_per_superclass[  # noqa: E111
                 episode_superclass]
             if self.num_ways:
@@ -293,6 +295,7 @@ class EpisodeDescriptionSampler(object):
                 num_ways = self.num_ways
             else:
                 num_ways = sample_num_ways_uniformly(  # noqa: E111
+                    random_gen,
                     num_superclass_classes,
                     min_ways=self.min_ways,
                     max_ways=self.max_ways_upper_bound)
@@ -303,6 +306,7 @@ class EpisodeDescriptionSampler(object):
             # episode_classes_rel will be [26, 24] which as usual are number relative
             # to the split.
             episode_subclass_ids = sample_class_ids_uniformly(
+                                        random_gen,
                                         num_ways,
                                         range(num_superclass_classes))
 
@@ -316,6 +320,7 @@ class EpisodeDescriptionSampler(object):
                 num_ways = self.num_ways
             else:  # noqa: E111
                 num_ways = sample_num_ways_uniformly(
+                    random_gen,
                     self.num_filtered_classes,
                     min_ways=self.min_ways,
                     max_ways=self.max_ways_upper_bound)
@@ -323,18 +328,18 @@ class EpisodeDescriptionSampler(object):
             ids_rel = [  # noqa: E111
                 class_id - self.class_set[0] for class_id in self._filtered_class_set
             ]
-            episode_classes_rel = sample_class_ids_uniformly(num_ways, ids_rel)  # noqa: E111
+            episode_classes_rel = sample_class_ids_uniformly(random_gen, num_ways, ids_rel)  # noqa: E111
 
         return episode_classes_rel
 
-    def sample_episode_description(self):  # noqa: E111
+    def sample_episode_description(self, random_gen: RandomState,):  # noqa: E111
         """Returns the composition of an episode.
 
         Returns:
           A sequence of `(class_id, num_support, num_query)` tuples, where
             relative `class_id` is an integer in [0, self.num_classes).
         """
-        class_ids = self.sample_class_ids()
+        class_ids = self.sample_class_ids(random_gen)
         images_per_class = np.array([
             self.dataset_spec.get_total_images_per_class(
                 self.class_set[cid]) for cid in class_ids
@@ -359,15 +364,17 @@ class EpisodeDescriptionSampler(object):
                     raise ValueError('The range provided for uniform sampling of the '  # noqa: E111
                                      'number of support examples per class is not valid: '
                                      'some classes do not have enough examples.')
-                num_support = RNG.randint(low=start, high=end + 1)
+                num_support = random_gen.randint(low=start, high=end + 1)
             num_support_per_class = [num_support for _ in class_ids]  # noqa: E111
         else:
             num_remaining_per_class = images_per_class - num_query  # noqa: E111
             support_set_size = sample_support_set_size(  # noqa: E111
+                random_gen,
                 num_remaining_per_class,
                 self.max_support_size_contrib_per_class,
                 max_support_set_size=self.max_support_set_size)
             num_support_per_class = sample_num_support_per_class(  # noqa: E111
+                random_gen,
                 images_per_class,
                 num_remaining_per_class,
                 support_set_size,

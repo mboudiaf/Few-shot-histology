@@ -27,7 +27,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('--figsize', type=list, default=[10, 10])
     parser.add_argument('--dpi', type=list, default=200,
                         help='Dots per inch when saving the fig')
-    parser.add_argument('--max_col', type=int, default=2,
+    parser.add_argument('--max_col', type=int, default=3,
                         help='Maximum number of columns for legend')
 
     args = parser.parse_args()
@@ -78,7 +78,7 @@ def main(args: argparse.Namespace) -> None:
                 conf_interv = conf_interv[valid]
 
                 n_epochs = mean.shape[0]
-                x = np.linspace(0, n_epochs - 1, (n_epochs))
+                x = np.linspace(0, 75000, (n_epochs))
 
                 label = f'{method} ({arch})'
                 ax.set_title(abrv2name[metric], size=32, weight='bold', y=1.1)
@@ -87,7 +87,7 @@ def main(args: argparse.Namespace) -> None:
 
         n_cols = min(args.max_col, len(filenames_dic[metric]))
         ax.legend(bbox_to_anchor=(0.5, 1.05), loc='center', ncol=n_cols, shadow=True)
-        ax.set_xlabel("Epochs")
+        ax.set_xlabel("Iteration")
         ax.grid(True)
         fig.tight_layout()
         save_path = p / f'{metric}.png'

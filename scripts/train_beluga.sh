@@ -3,10 +3,10 @@
 #SBATCH --cpus-per-task=6    # There are 40 CPU cores on Beluga GPU nodes
 #SBATCH --mem=20000M
 #SBATCH --time=10:00:00
-#SBATCH --account=????????
+#SBATCH --account=def-ibenayed
 #SBATCH --array=0-8
 
-#SBATCH --mail-user=????????
+#SBATCH --mail-user=malik.boudiaf.1@etsmtl.net
 #SBATCH --mail-type=BEGIN
 #SBATCH --mail-type=END
 #SBATCH --mail-type=FAIL
@@ -36,7 +36,7 @@ python3 -m src.train --base_config ${base_config_path} \
                      --method_config ${method_config_path} \
                      --opts data_path ${DATA_DIR} \
                             manual_seed ${SEEDS[$((SLURM_ARRAY_TASK_ID / 3))]} \
-                            train_sources "['crc-tp']" \
+                            train_sources "['breakhis']" \
                             val_sources "['nct']" \
-                            test_sources "['breakhis']" \
+                            test_sources "['crc-tp']" \
                             visu False

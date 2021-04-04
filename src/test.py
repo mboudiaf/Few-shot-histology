@@ -1,27 +1,16 @@
 import os
 import torch
 import argparse
-from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim import SGD, Adam
-from typing import Dict, List
 from tqdm import tqdm
 import numpy as np
-import time
-import torch.backends.cudnn as cudnn
-import matplotlib.pyplot as plt
-import random
 from .dataset.utils import Split
-from .dataset import config as config_lib
-from .dataset import dataset_spec as dataset_spec_lib
-from .dataset import pipeline
 from .models import __dict__ as all_models
 from .methods import __dict__ as all_methods
-from .losses import __dict__ as all_losses
-from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
-                   save_checkpoint, get_model_dir, make_episode_visualization, \
+from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, \
+                   get_model_dir, make_episode_visualization, \
                    load_checkpoint
 from .train import get_dataloader
+
 
 def parse_args() -> argparse.Namespace:
 
@@ -42,7 +31,6 @@ def main(args):
 
     # ============ Device ================
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_dir = get_model_dir(args)
 
     # ============ Testing method ================
     method = all_methods[args.method](args=args)
@@ -62,15 +50,18 @@ def main(args):
     print(f"=> There are {num_classes} classes in the test datasets")
 
     # ============ Model ================
-    model = all_models[args.arch](num_classes=num_classes_tr if args.method != 'MAML' else args.num_ways).to(device)
-    load_checkpoint(model, model_dir, type='best')
+    average_acc = []
+    for seed in args.seeds:
+        model_dir = get_model_dir(args, seed)
+        model = all_models[args.arch](num_classes=num_classes_tr if args.method != 'MAML' else args.num_ways).to(device)
+        load_checkpoint(model, model_dir, type='best')
 
-    # ============ Training loop ============
-    model.eval()
-    print('Starting testing ...')
-    test_acc = 0.
-    test_loss = 0.
-    with torch.no_grad():
+        # ============ Training loop ============
+        model.eval()
+        method.eval()
+        print(f'Starting testing for seed {seed}')
+        test_acc = 0.
+        test_loss = 0.
         tqdm_bar = tqdm(test_loader, total=args.test_iter, ascii=True)
         i = 0
         for data in tqdm_bar:
@@ -78,6 +69,7 @@ def main(args):
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
 
+            print(support_labels)
             # ============ Evaluation ============
             loss, soft_preds_q = method(x_s=support,
                                         x_q=query,
@@ -97,9 +89,9 @@ def main(args):
                            query_labels[task_id].cpu().numpy(),
                            soft_preds_q[task_id].cpu().numpy(),
                            save_path)
-            test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
-            if loss:
-                test_loss += loss
+            test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean().item()
+            if loss is not None:
+                test_loss += loss.detach().mean().item()
             if i % 10 == 0:
                 tqdm_bar.set_description(f'Test Prec@1 {test_acc / (i+1):.3f}  \
                                            Test loss {test_loss / (i+1):.3f}',
@@ -107,6 +99,8 @@ def main(args):
             if i >= args.test_iter:
                 break
             i += 1
+        average_acc.append(test_acc / args.test_iter)
+    print(f'--- Average accuracy over {len(args.seeds)} seeds = {np.mean(average_acc):.3f}')
 
 
 if __name__ == '__main__':

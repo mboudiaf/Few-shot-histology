@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import argparse
 from .utils import get_one_hot, compute_centroids, extract_features
 from .method import FSmethod
@@ -13,6 +14,7 @@ class SimpleShot(FSmethod):
     def __init__(self, args: argparse.Namespace):
 
         self.episodic_training = False
+        self.normalize = args.normalize
         super().__init__(args)
 
     def forward(self,
@@ -35,6 +37,9 @@ class SimpleShot(FSmethod):
         else:
             z_s = extract_features(x_s, model)
             z_q = extract_features(x_q, model)
+        if self.normalize:
+            z_s = F.normalize(z_s, dim=2)
+            z_q = F.normalize(z_q, dim=2)
         centroids = compute_centroids(z_s, y_s)  # [batch, num_class, d]
 
         l2_distance = (- 2 * z_q.matmul(centroids.transpose(1, 2)) \

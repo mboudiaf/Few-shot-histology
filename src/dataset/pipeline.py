@@ -11,13 +11,13 @@ from .dataset_spec import DatasetSpecification as DS
 from .config import EpisodeDescriptionConfig, DataConfig
 from tfrecord.torch.dataset import TFRecordDataset
 from .sampling import EpisodeDescriptionSampler
-RNG = np.random.RandomState(seed=None)
 
 
 def make_episode_pipeline(dataset_spec_list: List[Union[BDS, DS]],
                           split: Split,
                           episode_descr_config: EpisodeDescriptionConfig,
                           data_config: DataConfig,
+                          ignore_hierarchy_probability: int = 0.0,
                           **kwargs):
     """Returns a pipeline emitting data from potentially multiples source as Episodes.
 
@@ -26,6 +26,9 @@ def make_episode_pipeline(dataset_spec_list: List[Union[BDS, DS]],
       split: A learning_spec.Split object identifying the source (meta-)split.
       episode_descr_config: An instance of EpisodeDescriptionConfig containing
         parameters relating to sampling shots and ways for episodes.
+      ignore_hierarchy_probability: Float, if using a hierarchy, this flag makes
+        the sampler ignore the hierarchy for this proportion of episodes and
+        instead sample categories uniformly.
 
     Returns:
     """
@@ -93,15 +96,15 @@ class EpisodicDataset(torch.utils.data.IterableDataset):
                  max_query_size: int):
         super(EpisodicDataset).__init__()
         self.class_datasets = class_datasets
-        self.iter_datasets = class_datasets
         self.sampler = sampler
         self.transforms = transforms
         self.max_query_size = max_query_size
         self.max_support_size = max_support_size
+        self.random_gen = np.random.RandomState()
 
     def __iter__(self):
         while True:
-            episode_description = self.sampler.sample_episode_description()
+            episode_description = self.sampler.sample_episode_description(self.random_gen)
             support_images = []
             support_labels = []
             query_images = []
@@ -124,10 +127,10 @@ class EpisodicDataset(torch.utils.data.IterableDataset):
 
     def get_next(self, class_id):
         try:
-            sample_dic = next(self.iter_datasets[class_id])
+            sample_dic = next(self.class_datasets[class_id])
         except:
-            self.iter_datasets[class_id] = cycle_(self.class_datasets[class_id])
-            sample_dic = next(self.iter_datasets[class_id])
+            self.class_datasets[class_id] = cycle_(self.class_datasets[class_id])
+            sample_dic = next(self.class_datasets[class_id])
         return sample_dic
 
 
@@ -137,37 +140,53 @@ class BatchDataset(torch.utils.data.IterableDataset):
                  transforms: torchvision.transforms):
         super(BatchDataset).__init__()
         self.class_datasets = class_datasets
-        self.iter_datasets = class_datasets
         self.transforms = transforms
 
     def __iter__(self):
         while True:
-            rand_class = RNG.randint(len(self.class_datasets))
-            try:
-                sample_dic = next(self.iter_datasets[rand_class])
-            except:
-                self.iter_datasets[rand_class] = cycle_(self.class_datasets[rand_class])
-                sample_dic = next(self.iter_datasets[rand_class])
+            rand_class = self.random_gen.randint(len(self.class_datasets))
+            sample_dic = self.get_next(rand_class)
             transformed_image = self.transforms(sample_dic['image'])
             target = sample_dic['label'][0]
             yield transformed_image, target
+
+    def get_next(self, class_id):
+        try:
+            sample_dic = next(self.class_datasets[class_id])
+        except:
+            self.class_datasets[class_id] = cycle_(self.class_datasets[class_id])
+            sample_dic = next(self.class_datasets[class_id])
+        return sample_dic
 
 
 class ZipDataset(torch.utils.data.IterableDataset):
     def __init__(self,
                  dataset_list: List[EpisodicDataset]):
-        self.episodic_dataset_list = dataset_list
-        self.iter_list = dataset_list
+        self.dataset_list = dataset_list
+        self.random_gen = np.random.RandomState()
 
     def __iter__(self):
         while True:
-            rand_source: int = RNG.randint(len(self.episodic_dataset_list))
-            try:
-                next_e = next(self.iter_list[rand_source])
-            except:
-                self.iter_list[rand_source] = iter(self.episodic_dataset_list[rand_source])
-                next_e = next(self.iter_list[rand_source])
+            rand_source = self.random_gen.randint(len(self.dataset_list))
+            next_e = self.get_next(rand_source)
             yield next_e
+
+    def get_next(self, source_id):
+        try:
+            dataset = next(self.dataset_list[source_id])
+        except:
+            self.dataset_list[source_id] = iter(self.dataset_list[source_id])
+            dataset = next(self.dataset_list[source_id])
+        return dataset
+
+
+def worker_init_fn_(worker_id):
+    worker_info = torch.utils.data.get_worker_info()
+    dataset = worker_info.dataset  # the dataset copy in this worker process
+    random_gen = np.random.RandomState()
+    dataset.random_gen = random_gen
+    for d in dataset.dataset_list:
+        d.random_gen = random_gen
 
 
 def cycle_(iterable):

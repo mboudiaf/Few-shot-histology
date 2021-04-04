@@ -67,7 +67,7 @@ def make_episode_visualization(args: argparse.Namespace,
     fig = plt.figure(figsize=(18, 18), dpi=300)
     grid = ImageGrid(fig, 111,
                      nrows_ncols=(n_rows, n_columns),
-                     axes_pad=(0.4, 0.3),
+                     axes_pad=(0.4, 0.4),
                      direction='row',
                      )
 
@@ -77,10 +77,12 @@ def make_episode_visualization(args: argparse.Namespace,
             ax = grid[n_columns*i + j]
             if i < len(samples_s[j]):
                 img = samples_s[j][i]
+                # print(img.min(), img.max())
+                # assert img.min() >= 0. and img.max() <= 1.0, (img.min(), img.max())
                 make_plot(ax, img)
             ax.axis('off')
             if i == 0:
-                ax.set_title(f'Class {j}', size=20)
+                ax.set_title(f'Class {j+1}', size=20)
 
     # 1) visualize the query set
     for i in range(max_s, max_s + max_q):
@@ -88,14 +90,16 @@ def make_episode_visualization(args: argparse.Namespace,
             ax = grid[n_columns*i + j]
             if i - max_s < len(samples_q[j]):
                 img = samples_q[j][i - max_s]
+                # print(img.min(), img.max())
+                # assert img.min() >= 0. and img.max() <= 1.0, (img.min(), img.max())
                 make_plot(ax, img, preds_q[j][i - max_s])
             ax.axis('off')
     fig.suptitle(args.method, size=32, weight='bold', y=0.97)
-    fig.text(0.0, 0.66, 'Support', rotation=90, size=45)
-    fig.text(0.0, 0.31, 'Query', rotation=90, size=45)
+    fig.text(-0.1, 0.72, 'Support', rotation=90, size=45)
+    fig.text(-0.1, 0.35, 'Query', rotation=90, size=45)
     # fig.text(0.06, 0.32, '{', size=500, weight=0.)
     fig.tight_layout()
-    fig.savefig(save_path)
+    fig.savefig(save_path, bbox_inches='tight')
     fig.clf()
     print(f"Figure saved at {save_path}")
 
@@ -110,7 +114,7 @@ def make_plot(ax: matplotlib.axes.Axes,
         title[np.argmax(preds)] = r'$\mathbf{{{}}}$'.format(title[np.argmax(preds)])
         title = '/'.join(title)
         # print(title)
-        ax.set_title(title, size=12)
+        ax.set_title(title, size=14)
 
 
 def load_checkpoint(model, model_path, type='best'):
@@ -147,7 +151,7 @@ class AverageMeter(object):
             self.avg = alpha * val + (1 - alpha) * self.avg
 
 
-def get_model_dir(args: argparse.Namespace):
+def get_model_dir(args: argparse.Namespace, seed: int):
     train = "train={}".format('_'.join(args.train_sources))
     valid = "valid={}".format('_'.join(args.val_sources))
     return os.path.join(args.ckpt_path,
@@ -155,7 +159,7 @@ def get_model_dir(args: argparse.Namespace):
                         valid,
                         f'method={args.method}',
                         f'arch={args.arch}',
-                        f'seed={args.manual_seed}')
+                        f'seed={seed}')
 
 
 def save_checkpoint(state, folder, filename='model_best.pth.tar'):

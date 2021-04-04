@@ -1,0 +1,7 @@
+METHOD:
+  method: 'TIM'
+  normalize: True
+  tim_lr: 0.001
+  iter: 300
+  temp: 10
+  loss_weights: [1.0, 1.0,  0.1]

@@ -1,5 +1,7 @@
 # Sublime files
 
+results/
+
 *.sublime-project
 *.sublime-workspace
 checkpoints/

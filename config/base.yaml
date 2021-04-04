@@ -11,7 +11,7 @@ DATA:
   shuffle_queue_size: 500
 
 TRAINING:
-  manual_seed: 2021
+  seeds: [2021]
   arch: 'resnet18'
   batch_size: 100
   num_workers: 4
@@ -28,7 +28,7 @@ VALIDATION:
 
 TEST:
   test_batch_size: 1
-  test_iter: 10000
+  test_iter: 1000
 
 
 AUGMENTATIONS:
@@ -45,7 +45,7 @@ OPTIM:
 
 VISU:
   visu: False
-  max_s_visu: 2
+  max_s_visu: 1
   max_q_visu: 3
 
 EPISODES:
