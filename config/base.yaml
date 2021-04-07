@@ -8,13 +8,13 @@ DATA:
   test_transforms: ['resize', 'center_crop', 'normalize'] #Transforms applied to training data
   data_path: '/ssd/dataset/histology/converted/'
   ckpt_path: 'checkpoints'
-  shuffle_queue_size: 500
+  shuffle_queue_size: 50
 
 TRAINING:
   seeds: [2021]
   arch: 'resnet18'
   batch_size: 100
-  num_workers: 4
+  num_workers: 2
   train_freq: 50
   train_iter: 75000
   loss: '_CrossEntropy'

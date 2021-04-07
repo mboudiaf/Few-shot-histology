@@ -248,6 +248,9 @@ class EpisodeDescriptionSampler(object):
             self.use_bilevel_hierarchy = False  # noqa: E111
 
         if self.use_bilevel_hierarchy:
+            print("========================")
+            print("Using bilevel hierarchy !")
+            print("========================")
             # if self.num_ways is not None:  # noqa: E111
             #     raise ValueError('"use_bilevel_hierarchy" is incompatible with '
             #                      '"num_ways".')

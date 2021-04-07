@@ -9,7 +9,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 import matplotlib
-
 cmaps = ['winter', 'hsv', 'Wistia', 'BuGn']
 
 
@@ -40,13 +39,16 @@ def make_episode_visualization(args: argparse.Namespace,
     assert img_s.shape[-3:-1] == img_q.shape[-3:-1], f"Support's resolution is {img_s.shape[-3:-1]} \
                                                       Query's resolution is {img_q.shape[-3:-1]}"
 
-    if img_s.min() <= 0:
-        img_s *= std
-        img_s += mean
+    print(f"Support images between {img_s.min()} and {img_s.max()} -> Renormalizing")
+    img_s *= std
+    img_s += mean
+    print(f"Post normalization : {img_s.min()} and {img_s.max()}")
 
-    if img_q.min() <= 0:
-        img_q *= std
-        img_q += mean
+    # if img_q.min() < 0:
+    print(f"Query images between {img_q.min()} and {img_q.max()} -> Renormalizing")
+    img_q *= std
+    img_q += mean
+    print(f"Post normalization : {img_q.min()} and {img_q.max()}")
 
     Kq, num_classes = preds.shape
     Ks = img_s.shape[0]

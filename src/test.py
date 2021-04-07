@@ -46,7 +46,7 @@ def main(args):
                                               sources=args.test_sources,
                                               episodic=True,
                                               batch_size=args.test_batch_size,
-                                              split=Split["TRAIN"])
+                                              split=Split["TEST"])
     print(f"=> There are {num_classes} classes in the test datasets")
 
     # ============ Model ================
@@ -62,14 +62,12 @@ def main(args):
         print(f'Starting testing for seed {seed}')
         test_acc = 0.
         test_loss = 0.
-        tqdm_bar = tqdm(test_loader, total=args.test_iter, ascii=True)
+        tqdm_bar = tqdm(test_loader, total=args.test_iter)
         i = 0
         for data in tqdm_bar:
             support, query, support_labels, query_labels = data
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-
-            print(support_labels)
             # ============ Evaluation ============
             loss, soft_preds_q = method(x_s=support,
                                         x_q=query,

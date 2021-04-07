@@ -8,6 +8,8 @@ from .dataset_spec import BiLevelDatasetSpecification as BDS
 from .dataset_spec import DatasetSpecification as DS
 from .utils import Split
 
+import matplotlib.pyplot as plt
+
 
 class Reader(object):
     """Class reading data from one source and assembling examples.
@@ -76,6 +78,11 @@ class Reader(object):
 
     def decode_image(self, features, offset):
         # get BGR image from bytes
-        features["image"] = torch.tensor(cv2.imdecode(features["image"], -1)).permute(2, 0, 1) / 255
+        image = cv2.imdecode(features["image"], -1)
+        # plt.imshow(image)
+        # plt.show()
+        # from BGR to RGB
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        features["image"] = torch.tensor(image).permute(2, 0, 1) / 255
         features["label"] += offset
         return features
