@@ -3,6 +3,7 @@ rsync -av --exclude plots \
           --exclude checkpoints/ \
           --exclude logs/ \
           --exclude notebooks/ \
+	  --exclude results/ \
           --exclude figures/ \
           --exclude data \
           --exclude .git \

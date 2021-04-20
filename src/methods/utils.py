@@ -42,7 +42,6 @@ def extract_features(x: tensor, model: nn.Module):
     """
     batch, shot = x.size()[:2]
     feat_dim = x.size()[-3:]
-    z = model.extract_features(x.view(batch * shot, *feat_dim))
+    z = model(x.view(batch * shot, *feat_dim), feature=True)
     z = z.view(batch, shot, -1)  # [batch, s_shot, d]
-
     return z

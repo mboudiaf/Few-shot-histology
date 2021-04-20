@@ -18,6 +18,7 @@ def test_transform(data_config: DataConfig):
     resize_size = int(data_config.image_size*256./224.)
     transf_dict = {'resize': transforms.Resize(resize_size),
                    'center_crop': transforms.CenterCrop(data_config.image_size),
+                   'to_tensor': transforms.ToTensor(),
                    'normalize': normalize}
     augmentations = data_config.test_transforms
     return transforms.Compose([transf_dict[key] for key in augmentations])
@@ -30,6 +31,7 @@ def train_transform(data_config: DataConfig):
                    'random_resized_crop': transforms.RandomResizedCrop(data_config.image_size),
                    'jitter': transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
                    'random_flip': transforms.RandomHorizontalFlip(),
+                   'to_tensor': transforms.ToTensor(),
                    'normalize': normalize}
     augmentations = data_config.train_transforms
     return transforms.Compose([transf_dict[key] for key in augmentations])

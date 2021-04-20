@@ -12,8 +12,6 @@ class TIM(FSmethod):
     '''
 
     def __init__(self, args: argparse.Namespace):
-
-        self.episodic_training = False
         self.temp = args.temp
         self.normalize = args.normalize
         self.iter = args.iter

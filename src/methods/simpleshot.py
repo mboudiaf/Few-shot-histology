@@ -12,8 +12,6 @@ class SimpleShot(FSmethod):
     '''
 
     def __init__(self, args: argparse.Namespace):
-
-        self.episodic_training = False
         self.normalize = args.normalize
         super().__init__(args)
 

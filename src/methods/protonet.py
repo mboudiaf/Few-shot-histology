@@ -11,8 +11,6 @@ class ProtoNet(FSmethod):
     '''
 
     def __init__(self, args: argparse.Namespace):
-
-        self.episodic_training = True
         super().__init__(args)
 
     def forward(self,

@@ -37,6 +37,7 @@ class MetaModule(nn.Module):
         if params is None:
             return None
 
+        # print(params.keys())
         all_names = tuple(params.keys())
         if (key, all_names) not in self._children_modules_parameters_cache:
             if key is None:
@@ -50,6 +51,7 @@ class MetaModule(nn.Module):
                     key_re.sub(r'\1', k) for k in all_names if key_re.match(k) is not None]
 
         names = self._children_modules_parameters_cache[(key, all_names)]
+        # print(key, names)
         if not names:
             warnings.warn('Module `{0}` has no parameter corresponding to the '
                           'submodule named `{1}` in the dictionary `params` '

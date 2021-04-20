@@ -2,21 +2,23 @@ import os
 import torch
 import argparse
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim import SGD, Adam
+from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim import Adam
 from typing import Dict, List
 from tqdm import tqdm
 import numpy as np
 import time
 import torch.backends.cudnn as cudnn
-import matplotlib.pyplot as plt
 import random
+from functools import partial
+
+from .models.standard import __dict__ as standard_dict
+from .models.meta import __dict__ as meta_dict
 from .dataset.utils import Split
 from .dataset import config as config_lib
 from .dataset import dataset_spec as dataset_spec_lib
 from .dataset import pipeline
 from .dataset.pipeline import worker_init_fn_
-from .models import __dict__ as all_models
 from .methods import __dict__ as all_methods
 from .losses import __dict__ as all_losses
 from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, AverageMeter, \
@@ -69,11 +71,11 @@ def get_dataloader(args: argparse.Namespace,
                           split=split,
                           data_config=data_config,
                           episode_descr_config=episod_config)
-
+    worker_init_fn = partial(worker_init_fn_, seed=args.seeds)
     loader = DataLoader(dataset=dataset,
                         batch_size=batch_size,
                         num_workers=args.num_workers,
-                        worker_init_fn=worker_init_fn_)
+                        worker_init_fn=worker_init_fn)
     num_classes = sum([len(d_spec.get_classes(split=Split["TRAIN"])) for d_spec in all_dataset_specs])
     return loader, num_classes
 
@@ -94,15 +96,14 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_dir = get_model_dir(args, args.seeds)
 
-    # ============ Data spec ================
-
     # ============ Training method ================
     method = all_methods[args.method](args=args)
+    print(f"=> Using {args.method} method")
 
     # ============ Data loaders =========
     train_loader, num_classes = get_dataloader(args=args,
                                                sources=args.train_sources,
-                                               episodic=method.episodic_training,
+                                               episodic=args.episodic_training,
                                                batch_size=args.batch_size,
                                                split=Split["TRAIN"])
 
@@ -119,7 +120,7 @@ def main(args):
                                                    split=Split["TEST"])
 
     #  If you want to get the total number of classes (i.e from combined datasets)
-    if not method.episodic_training:
+    if not args.episodic_training:
         loss_fn = all_losses[args.loss](args=args, num_classes=num_classes, reduction='none')
 
     print(f"=> There are {num_classes} classes in the train datasets")
@@ -127,9 +128,16 @@ def main(args):
     print(f"=> There are {num_classes_test} classes in the test datasets")
 
     # ============ Model and optim ================
-    model = all_models[args.arch](num_classes=num_classes if args.method != 'MAML' else args.num_ways).to(device)
+    if 'MAML' in args.method:
+        print(f"Meta {args.arch} loaded")
+        model = meta_dict[args.arch](num_classes=args.num_ways, use_fc=args.use_fc)
+    else:
+        print(f"Standard {args.arch} loaded")
+        model = standard_dict[args.arch](num_classes=num_classes, use_fc=args.use_fc)
+
+    model = model.to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    scheduler = None
+    scheduler = CosineAnnealingLR(optimizer, args.train_iter, eta_min=1e-9)
 
     # ============ Prepare metrics ================
     metrics: Dict[str, torch.tensor] = {"train_loss": torch.zeros(int(args.train_iter / args.train_freq)).type(torch.float32),
@@ -156,7 +164,7 @@ def main(args):
         # ============ Make a training iteration ============
         model.zero_grad()
         t0 = time.time()
-        if method.episodic_training:
+        if args.episodic_training:
             support, query, support_labels, target = data
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, target = query.to(device), target.to(device, non_blocking=True)

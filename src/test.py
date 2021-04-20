@@ -38,7 +38,7 @@ def main(args):
     # ============ Data loaders =========
     _, num_classes_tr = get_dataloader(args=args,
                                        sources=args.train_sources,
-                                       episodic=method.episodic_training,
+                                       episodic=args.episodic_training,
                                        batch_size=args.batch_size,
                                        split=Split["TRAIN"])
 

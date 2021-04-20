@@ -44,7 +44,7 @@ class wide_basic(nn.Module):
 
 
 class Wide_ResNet(nn.Module):
-    def __init__(self, depth, widen_factor, dropout_rate, num_classes):
+    def __init__(self, depth, widen_factor, dropout_rate, num_classes, use_fc=True):
         super(Wide_ResNet, self).__init__()
         self.in_planes = 16
 
@@ -52,7 +52,7 @@ class Wide_ResNet(nn.Module):
         n = (depth - 4) // 6
         k = widen_factor
 
-        print('| Wide-Resnet %dx%d' % (depth, k))
+        # print('| Wide-Resnet %dx%d' % (depth, k))
         nStages = [16, 16 * k, 32 * k, 64 * k]
 
         self.conv1 = conv3x3(3, nStages[0])
@@ -61,7 +61,8 @@ class Wide_ResNet(nn.Module):
         self.layer3 = self._wide_layer(wide_basic, nStages[3], n, dropout_rate, stride=2)
         self.bn1 = nn.BatchNorm2d(nStages[3], momentum=0.9)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.linear = nn.Linear(nStages[3], num_classes)
+        if use_fc:
+            self.linear = nn.Linear(nStages[3], num_classes)
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -79,7 +80,7 @@ class Wide_ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def extract_features(self, x):
+    def forward(self, x, feature=False):
         out = self.conv1(x)
         out = self.layer1(out)
         out = self.layer2(out)
@@ -87,20 +88,14 @@ class Wide_ResNet(nn.Module):
         out = F.relu(self.bn1(out))
         out = self.avgpool(out)
         out = out.view(out.size(0), -1)
+
+        if feature:
+            return out
+        out = self.linear(out)
         return out
 
-    def forward(self, x, feature=False):
-        x = self.extract_features(x)
-        x = self.linear(x)
-        return x
 
-
-def wideres(num_classes):
+def wideres2810(num_classes, use_fc):
     """Constructs a wideres-28-10 model without dropout.
     """
-    return Wide_ResNet(28, 10, 0, num_classes)
-
-
-if __name__ == '__main__':
-    net = Wide_ResNet(28, 10, 0.3, 10)
-    y = net(Variable(torch.randn(1, 3, 32, 32)))
+    return Wide_ResNet(28, 10, 0, num_classes, use_fc)

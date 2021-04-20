@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import argparse
 from collections import OrderedDict
 from .method import FSmethod
-from ..models.metamodules import MetaModule
+from ..models.meta.metamodules import MetaModule
 from .utils import get_one_hot
 
 
@@ -15,7 +15,6 @@ class MAML(FSmethod):
 
     def __init__(self, args: argparse.Namespace):
 
-        self.episodic_training = True
         self.step_size = args.step_size
         self.first_order = args.first_order
         super().__init__(args)

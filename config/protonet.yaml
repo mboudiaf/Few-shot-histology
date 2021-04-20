@@ -1,3 +1,6 @@
+TRAINING:
+  episodic_training: True
+
 METHOD:
   method: 'ProtoNet'
   batch_size: 1

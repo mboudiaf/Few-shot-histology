@@ -13,7 +13,6 @@ class MatchingNet(FSmethod):
 
     def __init__(self, args: argparse.Namespace):
 
-        self.episodic_training = True
         self.eps = args.eps
         super().__init__(args)
 

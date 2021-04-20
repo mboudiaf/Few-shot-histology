@@ -9,8 +9,6 @@ class FSmethod(nn.Module):
     Abstract class for few-shot methods
     '''
     def __init__(self, args: argparse.Namespace):
-        if not hasattr(self, 'episodic_training'):
-            raise ValueError("Must specify episodic_training attribute")
         super(FSmethod, self).__init__()
 
     def forward(self,

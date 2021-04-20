@@ -29,14 +29,14 @@ METHODS=($METHODS)
 SEEDS=($SEEDS)
 
 base_config_path="config/base.yaml"
-
-method_config_path="config/${METHODS[$((SLURM_ARRAY_TASK_ID % 3))]}.yaml"
+method_config_path="config/${METHODS[$((SLURM_ARRAY_TASK_ID / 3))]}.yaml"
 
 python3 -m src.train --base_config ${base_config_path} \
                      --method_config ${method_config_path} \
                      --opts data_path ${DATA_DIR} \
-                            manual_seed ${SEEDS[$((SLURM_ARRAY_TASK_ID / 3))]} \
-                            train_sources "['breakhis']" \
+                            seeds "[${SEEDS[$((SLURM_ARRAY_TASK_ID % 3))]}]" \
+                            train_sources "['crc-tp']" \
                             val_sources "['nct']" \
-                            test_sources "['crc-tp']" \
-                            visu False
+                            test_sources "['breakhis']" \
+
+# python3 -m src.train --base_config ${base_config_path} --method_config ${method_config_path} --opts data_path ${DATA_DIR} manual_seed ${SEEDS[$((SLURM_ARRAY_TASK_ID / 3))]} train_sources "['breakhis']" val_sources "['nct']" test_sources "['crc-tp']"

@@ -1,9 +1,5 @@
 import torch.nn as nn
 
-__all__ = ['resnet10', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
-           'resnet152']
-
-
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
@@ -87,7 +83,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False):
+    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, use_fc=True):
         super(ResNet, self).__init__()
         self.inplanes = 64
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
@@ -99,7 +95,8 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(512 * block.expansion, num_classes)
+        if use_fc:
+            self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -134,7 +131,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def extract_features(self, x):
+    def forward(self, x, feature=False):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -146,10 +143,8 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        return x
-
-    def forward(self, x):
-        x = self.extract_features(x)
+        if feature:
+            return x
         x = self.fc(x)
         return x
 
