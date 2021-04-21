@@ -5,6 +5,7 @@ import argparse
 from collections import OrderedDict
 from .method import FSmethod
 from ..models.meta.metamodules import MetaModule
+from ..models.meta.metamodules.batchnorm import _MetaBatchNorm
 from .utils import get_one_hot
 
 
@@ -17,7 +18,13 @@ class MAML(FSmethod):
 
         self.step_size = args.step_size
         self.first_order = args.first_order
+        self.num_steps = args.num_steps
         super().__init__(args)
+
+    def freeze_bn(self, model):
+        for module in model.modules():
+            if isinstance(module, _MetaBatchNorm):
+                module.eval()
 
     def forward(self,
                 x_s: torch.tensor,
@@ -32,27 +39,29 @@ class MAML(FSmethod):
             y_s : torch.Tensor of shape [batch, s_shot]
             y_q : torch.Tensor of shape [batch, q_shot]
         """
+        model.train()
         device = x_s.device
         outer_loss = torch.tensor(0., device=device)
         soft_preds = torch.zeros_like(get_one_hot(y_q, y_s.unique().size(0)))
         for task_idx, (support, y_support, query, y_query) in \
                 enumerate(zip(x_s, y_s, x_q, y_q)):
+            params = None
+            for i in range(self.num_steps):
+                train_logit = model(support, params=params)
+                inner_loss = F.cross_entropy(train_logit, y_support)
 
-            train_logit = model(support)
-            inner_loss = F.cross_entropy(train_logit, y_support)
+                model.zero_grad()
+                params = self.gradient_update_parameters(model,
+                                                         inner_loss,
+                                                         step_size=self.step_size,
+                                                         first_order=self.first_order,
+                                                         params=params)
 
-            model.zero_grad()
-            params = self.gradient_update_parameters(model,
-                                                     inner_loss,
-                                                     step_size=self.step_size,
-                                                     first_order=self.first_order)
-
-            query_logit = model(query, params=params)
-            outer_loss += F.cross_entropy(query_logit, y_query)
-
-            with torch.no_grad():
+            with torch.set_grad_enabled(self.training):
+                query_logit = model(query, params=params)
+                outer_loss += F.cross_entropy(query_logit, y_query)
                 soft_preds[task_idx] = query_logit.detach().softmax(-1)
-
+        model.eval()
         return outer_loss, soft_preds
 
     def gradient_update_parameters(self,

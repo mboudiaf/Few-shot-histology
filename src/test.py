@@ -3,12 +3,15 @@ import torch
 import argparse
 from tqdm import tqdm
 import numpy as np
+import pandas as pd
+
 from .dataset.utils import Split
-from .models import __dict__ as all_models
+from .models.standard import __dict__ as standard_dict
+from .models.meta import __dict__ as meta_dict
 from .methods import __dict__ as all_methods
 from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, \
                    get_model_dir, make_episode_visualization, \
-                   load_checkpoint
+                   load_checkpoint, blockPrint, enablePrint
 from .train import get_dataloader
 
 
@@ -31,30 +34,38 @@ def main(args):
 
     # ============ Device ================
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    res_path = os.path.join(args.res_path, args.method)
+    os.makedirs(res_path, exist_ok=True)
 
     # ============ Testing method ================
     method = all_methods[args.method](args=args)
-
-    # ============ Data loaders =========
-    _, num_classes_tr = get_dataloader(args=args,
-                                       sources=args.train_sources,
-                                       episodic=args.episodic_training,
-                                       batch_size=args.batch_size,
-                                       split=Split["TRAIN"])
-
-    test_loader, num_classes = get_dataloader(args=args,
-                                              sources=args.test_sources,
-                                              episodic=True,
-                                              batch_size=args.test_batch_size,
-                                              split=Split["TEST"])
-    print(f"=> There are {num_classes} classes in the test datasets")
-
-    # ============ Model ================
     average_acc = []
+
     for seed in args.seeds:
+        args.seed = seed
+        # ============ Data loaders =========
+        _, num_classes_tr = get_dataloader(args=args,
+                                           sources=args.train_sources,
+                                           episodic=args.episodic_training,
+                                           batch_size=args.batch_size,
+                                           split=Split["TRAIN"])
+
+        test_loader, num_classes = get_dataloader(args=args,
+                                                  sources=args.test_sources,
+                                                  episodic=True,
+                                                  batch_size=args.test_batch_size,
+                                                  split=Split["TEST"])
+        print(f"=> There are {num_classes} classes in the test datasets")
+        # ============ Model ================
         model_dir = get_model_dir(args, seed)
-        model = all_models[args.arch](num_classes=num_classes_tr if args.method != 'MAML' else args.num_ways).to(device)
+        if 'MAML' in args.method:
+            print(f"Meta {args.arch} loaded")
+            model = meta_dict[args.arch](num_classes=args.num_ways, use_fc=args.use_fc)
+        else:
+            print(f"Standard {args.arch} loaded")
+            model = standard_dict[args.arch](num_classes=num_classes_tr, use_fc=args.use_fc)
         load_checkpoint(model, model_dir, type='best')
+        model = model.to(device)
 
         # ============ Training loop ============
         model.eval()
@@ -68,6 +79,12 @@ def main(args):
             support, query, support_labels, query_labels = data
             support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
             query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
+
+            if args.method == 'MAML':  # MAML uses transductive batchnorm, whic corrupts the model
+                blockPrint()
+                load_checkpoint(model, model_dir, type='best')
+                enablePrint()
+
             # ============ Evaluation ============
             loss, soft_preds_q = method(x_s=support,
                                         x_q=query,
@@ -94,11 +111,46 @@ def main(args):
                 tqdm_bar.set_description(f'Test Prec@1 {test_acc / (i+1):.3f}  \
                                            Test loss {test_loss / (i+1):.3f}',
                                          )
+                update_csv(args=args,
+                           task_id=i,
+                           acc=test_acc / (i+1),
+                           path=os.path.join(res_path, 'test.csv'))
             if i >= args.test_iter:
                 break
             i += 1
         average_acc.append(test_acc / args.test_iter)
     print(f'--- Average accuracy over {len(args.seeds)} seeds = {np.mean(average_acc):.3f}')
+
+
+def update_csv(args: argparse.Namespace,
+               task_id: int,
+               acc: float,
+               path: str):
+    # res = OrderedDict()
+    try:
+        res = pd.read_csv(path)
+    except:
+        res = pd.DataFrame()
+    records = res.to_dict('records')
+    # Check whether the entry exist already, if yes, simply update the accuracy
+    match = False
+    for entry in records:
+        match = [str(value) == str(args[param]) for param, value in list(entry.items()) if param not in ['acc', 'task']]
+        match = (sum(match) == len(match))
+        if match:
+            entry['task'] = task_id
+            entry['acc'] = round(acc, 4)
+            break
+
+    # If entry did not exist, just create it
+    if not match:
+        new_entry = {param: args[param] for param in args.simu_params}
+        new_entry['task'] = task_id
+        new_entry['acc'] = round(acc, 4)
+        records.append(new_entry)
+    # Save back to dataframe
+    df = pd.DataFrame.from_records(records)
+    df.to_csv(path, index=False)
 
 
 if __name__ == '__main__':

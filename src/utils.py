@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 import matplotlib
+import sys
 cmaps = ['winter', 'hsv', 'Wistia', 'BuGn']
 
 
@@ -181,6 +182,14 @@ def compute_confidence_interval(data, axis=0):
     std = np.std(a, axis=axis)
     pm = 1.96 * (std / np.sqrt(a.shape[axis]))
     return m, pm
+
+
+def enablePrint():
+    sys.stdout = sys.__stdout__
+
+
+def blockPrint():
+    sys.stdout = open(os.devnull, 'w')
 
 
 class CfgNode(dict):

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import argparse
-from .utils import get_one_hot, compute_centroids, extract_features
+from .utils import compute_centroids, extract_features
 from .method import FSmethod
 
 

@@ -147,8 +147,6 @@ class EpisodicDataset(torch.utils.data.IterableDataset):
         sample_dic = decode_feat_dic(sample_dic)
         return sample_dic
 
-
-
 class BatchDataset(torch.utils.data.IterableDataset):
     def __init__(self,
                  class_datasets: List[TFRecordDataset],

@@ -71,7 +71,7 @@ def get_dataloader(args: argparse.Namespace,
                           split=split,
                           data_config=data_config,
                           episode_descr_config=episod_config)
-    worker_init_fn = partial(worker_init_fn_, seed=args.seeds)
+    worker_init_fn = partial(worker_init_fn_, seed=args.seed)
     loader = DataLoader(dataset=dataset,
                         batch_size=batch_size,
                         num_workers=args.num_workers,
@@ -83,18 +83,18 @@ def get_dataloader(args: argparse.Namespace,
 def main(args):
 
     if args.seeds:
-        args.seeds = args.seeds[0]
+        args.seed = args.seeds[0]
         cudnn.benchmark = False
         cudnn.deterministic = True
-        torch.cuda.manual_seed(args.seeds)
-        np.random.seed(args.seeds)
-        torch.manual_seed(args.seeds)
-        torch.cuda.manual_seed_all(args.seeds)
-        random.seed(args.seeds)
+        torch.cuda.manual_seed(args.seed)
+        np.random.seed(args.seed)
+        torch.manual_seed(args.seed)
+        torch.cuda.manual_seed_all(args.seed)
+        random.seed(args.seed)
 
     # ============ Device ================
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_dir = get_model_dir(args, args.seeds)
+    model_dir = get_model_dir(args, args.seed)
 
     # ============ Training method ================
     method = all_methods[args.method](args=args)
@@ -162,7 +162,6 @@ def main(args):
             break
 
         # ============ Make a training iteration ============
-        model.zero_grad()
         t0 = time.time()
         if args.episodic_training:
             support, query, support_labels, target = data
@@ -219,8 +218,6 @@ def main(args):
             for k, e in metrics.items():
                 metrics_path = os.path.join(model_dir, f"{k}.npy")
                 np.save(metrics_path, e.detach().cpu().numpy())
-            model.train()
-            method.train()
 
         i += 1
 
@@ -269,6 +266,9 @@ def test(i, loader, model, method, model_dir, metrics, best_val_acc, device):
     for k in metrics:
         if 'test' in k:
             metrics[k][int(i / args.val_freq)] = eval(k)
+
+    model.train()
+    method.train()
 
 
 def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device):
@@ -320,7 +320,6 @@ def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device)
                                'best_acc': best_val_acc},
                         folder=model_dir)
     print(f'Iteration: [{i}/{args.train_iter}] \t Val Prec@1 {val_acc:.3f} ({best_val_acc:.3f})\t')
-    return best_val_acc
 
     for k in metrics:
         if 'val' in k:
@@ -329,8 +328,10 @@ def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device)
     for k, e in metrics.items():
         metrics_path = os.path.join(model_dir, f"{k}.npy")
         np.save(metrics_path, e.detach().cpu().numpy())
+
     model.train()
     method.train()
+    return best_val_acc
 
 
 if __name__ == '__main__':
