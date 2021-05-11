@@ -12,13 +12,14 @@ seeds="[2021,2022,2023]"
 train="['$train']"
 valid="['nct']"
 test="['$test']"
-
+DATA_DIR=$SLURM_TMPDIR/data/converted
 # dirname="results/train=${train}/valid=${valid}/test=${test}/shot=${shot}/"
 # mkdir -p -- "$dirname"
 python3 -m src.test --base_config ${base_config_path} \
                     --method_config ${method_config_path} \
                     --opts num_support ${shot} \
                            train_sources ${train} \
+                           data_path ${DATA_DIR} \
                            seeds ${seeds} \
                            visu ${visu} \
                            val_sources ${valid} \

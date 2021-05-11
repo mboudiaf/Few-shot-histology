@@ -245,6 +245,9 @@ class EpisodeDescriptionSampler(object):
             self.num_ways = self.num_classes  # noqa: E111
 
         if episode_descr_config.ignore_bilevel_ontology:
+            print("========================")
+            print("Ignoring bilevel hierarchy !")
+            print("========================")
             self.use_bilevel_hierarchy = False  # noqa: E111
 
         if self.use_bilevel_hierarchy:

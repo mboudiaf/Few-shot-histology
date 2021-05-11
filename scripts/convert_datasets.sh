@@ -1,4 +1,4 @@
-python3 src/dataset/create_records.py --records_root /ssd/dataset/histology/converted/ --data_root /ssd/dataset/histology/original/Breast\ cancer/ --name breakhis
+python3 -m src.dataset.create_records --records_root /ssd/dataset/histology/converted/ --data_root /ssd/dataset/histology/original/Breast\ cancer/ --name breakhis
 
 
 python3 src/dataset/create_records.py --records_root /ssd/dataset/histology/converted/ --data_root /ssd/dataset/histology/original/Breast\ cancer/ --name bach

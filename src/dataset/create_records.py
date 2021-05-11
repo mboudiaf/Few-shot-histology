@@ -1,6 +1,4 @@
 from absl import logging
-from utils import Split
-import dataset_spec as ds_spec
 import numpy as np
 import tensorflow.compat.v1 as tf
 import os
@@ -14,6 +12,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import List
 import argparse
+from .utils import Split
+from . import dataset_spec as ds_spec
 
 DEFAULT_FILE_PATTERN = '{}.tfrecords'
 TRAIN_TEST_FILE_PATTERN = '{}_{}.tfrecords'
