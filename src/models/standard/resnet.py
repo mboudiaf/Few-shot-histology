@@ -1,4 +1,5 @@
 import torch.nn as nn
+from .utils import load_pretrained_weights
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -86,7 +87,7 @@ class ResNet(nn.Module):
     def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, use_fc=True):
         super(ResNet, self).__init__()
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=1,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -153,13 +154,17 @@ def resnet10(**kwargs):
     """Constructs a ResNet-10 model.
     """
     model = ResNet(BasicBlock, [1, 1, 1, 1], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet10", load_fc=False)
     return model
 
 
-def resnet18(**kwargs):
+def resnet18(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-18 model.
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet18", load_fc=False)
     return model
 
 
@@ -167,6 +172,8 @@ def resnet34(**kwargs):
     """Constructs a ResNet-34 model.
     """
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet34", load_fc=False)
     return model
 
 
@@ -174,6 +181,8 @@ def resnet50(**kwargs):
     """Constructs a ResNet-50 model.
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet50", load_fc=False)
     return model
 
 
@@ -181,6 +190,8 @@ def resnet101(**kwargs):
     """Constructs a ResNet-101 model.
     """
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet101", load_fc=False)
     return model
 
 
@@ -188,4 +199,6 @@ def resnet152(**kwargs):
     """Constructs a ResNet-152 model.
     """
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet152", load_fc=False)
     return model

@@ -1,5 +1,5 @@
 import torch
-import torch.tensor as tensor
+from torch import Tensor as tensor
 import torch.nn as nn
 
 
