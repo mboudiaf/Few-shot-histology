@@ -150,7 +150,7 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet10(**kwargs):
+def resnet10(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-10 model.
     """
     model = ResNet(BasicBlock, [1, 1, 1, 1], **kwargs)
@@ -168,7 +168,7 @@ def resnet18(pretrained : bool = False, **kwargs):
     return model
 
 
-def resnet34(**kwargs):
+def resnet34(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-34 model.
     """
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
@@ -177,7 +177,7 @@ def resnet34(**kwargs):
     return model
 
 
-def resnet50(**kwargs):
+def resnet50(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-50 model.
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
@@ -186,7 +186,7 @@ def resnet50(**kwargs):
     return model
 
 
-def resnet101(**kwargs):
+def resnet101(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-101 model.
     """
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
@@ -195,7 +195,7 @@ def resnet101(**kwargs):
     return model
 
 
-def resnet152(**kwargs):
+def resnet152(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-152 model.
     """
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)

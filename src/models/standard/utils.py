@@ -1,4 +1,3 @@
-from torch.utils import model_zoo
 from torchvision import _internally_replaced_utils
 
 model_urls = {
@@ -10,17 +9,14 @@ model_urls = {
 }
 
 
-
 def load_pretrained_weights(model, arch, load_fc=True):
     """ Loads pretrained weights, and downloads if loading for the first time. """
-    # state_dict = model_zoo.load_url(url_map[model_name])
     state_dict = _internally_replaced_utils.load_state_dict_from_url(model_urls[arch], progress=True)
     if load_fc:
         try:
             model.load_state_dict(state_dict)
         except RuntimeError as e:
             print('Ignoring "' + str(e) + '"')
-    # model.load_state_dict(state_dict)
     else:
         state_dict.pop('fc.weight')
         state_dict.pop('fc.bias')
