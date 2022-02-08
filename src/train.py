@@ -130,10 +130,10 @@ def main(args):
     # ============ Model and optim ================
     if 'MAML' in args.method:
         print(f"Meta {args.arch} loaded")
-        model = meta_dict[args.arch](pretrained=args.pretrained, num_classes=args.num_ways, use_fc=args.use_fc)
+        model = meta_dict[args.arch](pretrained=args.pretrained, num_classes=args.num_ways)
     else:
         print(f"Standard {args.arch} loaded")
-        model = standard_dict[args.arch](pretrained=args.pretrained, num_classes=num_classes, use_fc=args.use_fc)
+        model = standard_dict[args.arch](pretrained=args.pretrained, num_classes=num_classes)
 
     model = model.to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
