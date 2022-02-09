@@ -1,5 +1,6 @@
 checkpoints/
 results/
+*.out
 *.sublime-project
 *.sublime-workspace
 

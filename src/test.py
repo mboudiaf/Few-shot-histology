@@ -11,7 +11,8 @@ from .models.meta import __dict__ as meta_dict
 from .methods import __dict__ as all_methods
 from .utils import load_cfg_from_cfg_file, merge_cfg_from_list, \
                    get_model_dir, make_episode_visualization, \
-                   load_checkpoint, blockPrint, enablePrint
+                   load_checkpoint, blockPrint, enablePrint, \
+                   compute_confidence_interval
 from .train import get_dataloader
 
 
@@ -40,6 +41,7 @@ def main(args):
     # ============ Testing method ================
     method = all_methods[args.method](args=args)
     average_acc = []
+    average_std = []
 
     for seed in args.seeds:
         args.seed = seed
@@ -60,10 +62,10 @@ def main(args):
         model_dir = get_model_dir(args, seed)
         if 'MAML' in args.method:
             print(f"Meta {args.arch} loaded")
-            model = meta_dict[args.arch](num_classes=args.num_ways, use_fc=args.use_fc)
+            model = meta_dict[args.arch](pretrained=args.pretrained, num_classes=args.num_ways)
         else:
             print(f"Standard {args.arch} loaded")
-            model = standard_dict[args.arch](num_classes=num_classes_tr, use_fc=args.use_fc)
+            model = standard_dict[args.arch](pretrained=args.pretrained, num_classes=num_classes_tr)
         load_checkpoint(model, model_dir, type='best')
         model = model.to(device)
 
@@ -73,6 +75,7 @@ def main(args):
         print(f'Starting testing for seed {seed}')
         test_acc = 0.
         test_loss = 0.
+        predictions = []
         tqdm_bar = tqdm(test_loader, total=args.test_iter)
         i = 0
         for data in tqdm_bar:
@@ -104,27 +107,34 @@ def main(args):
                            query_labels[task_id].cpu().numpy(),
                            soft_preds_q[task_id].cpu().numpy(),
                            save_path)
-            test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean().item()
+            predictions.append((soft_preds_q.argmax(-1) == query_labels).float().mean().item())
+            test_acc, test_std = compute_confidence_interval(predictions)
             if loss is not None:
                 test_loss += loss.detach().mean().item()
             if i % 10 == 0:
-                tqdm_bar.set_description(f'Test Prec@1 {test_acc / (i+1):.3f}  \
+                tqdm_bar.set_description(f'Test Prec@1 {test_acc :.3f}  \
+                                           Test 95CI@1 {test_std :.4f}  \
                                            Test loss {test_loss / (i+1):.3f}',
                                          )
                 update_csv(args=args,
                            task_id=i,
                            acc=test_acc / (i+1),
+                           std=test_std,
                            path=os.path.join(res_path, 'test.csv'))
             if i >= args.test_iter:
                 break
             i += 1
-        average_acc.append(test_acc / args.test_iter)
+        average_acc.append(test_acc)
+        average_std.append(test_std)
+
     print(f'--- Average accuracy over {len(args.seeds)} seeds = {np.mean(average_acc):.3f}')
+    print(f'--- Average 95\% Confidence Interval over {len(args.seeds)} seeds = {np.mean(average_std):.4f}')
 
 
 def update_csv(args: argparse.Namespace,
                task_id: int,
                acc: float,
+               std: float,
                path: str):
     # res = OrderedDict()
     try:
@@ -135,11 +145,12 @@ def update_csv(args: argparse.Namespace,
     # Check whether the entry exist already, if yes, simply update the accuracy
     match = False
     for entry in records:
-        match = [str(value) == str(args[param]) for param, value in list(entry.items()) if param not in ['acc', 'task']]
+        match = [str(value) == str(args[param]) for param, value in list(entry.items()) if param not in ['acc', 'task', 'std']]
         match = (sum(match) == len(match))
         if match:
             entry['task'] = task_id
             entry['acc'] = round(acc, 4)
+            entry['std'] = round(std, 4)
             break
 
     # If entry did not exist, just create it
@@ -147,6 +158,7 @@ def update_csv(args: argparse.Namespace,
         new_entry = {param: args[param] for param in args.simu_params}
         new_entry['task'] = task_id
         new_entry['acc'] = round(acc, 4)
+        new_entry['std'] = round(std, 4)
         records.append(new_entry)
     # Save back to dataframe
     df = pd.DataFrame.from_records(records)

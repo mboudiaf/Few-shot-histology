@@ -34,7 +34,7 @@ VALIDATION:
 TEST:
   test_batch_size: 1
   test_iter: 1000
-  simu_params: ['train_sources', 'val_sources', 'test_sources', 'arch', 'num_support', 'seed']
+  simu_params: ['train_sources', 'val_sources', 'test_sources', 'arch', 'image_size', 'pretrained', 'num_support', 'seed']
 
 
 AUGMENTATIONS:

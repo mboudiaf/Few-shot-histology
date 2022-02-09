@@ -161,9 +161,10 @@ def get_model_dir(args: argparse.Namespace, seed: int):
     return os.path.join(args.ckpt_path,
                         train,
                         valid,
-                        f'arch={args.arch}',
                         f'method={model_type}',
                         f'pretrained={args.pretrained}',
+                        f'image_size={args.image_size}',
+                        f'arch={args.arch}',
                         f'seed={seed}')
 
 
