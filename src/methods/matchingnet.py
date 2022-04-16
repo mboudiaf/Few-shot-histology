@@ -41,7 +41,7 @@ class MatchingNet(FSmethod):
                                           y_s,
                                           z_q)  # [batch, num_classes, q_shot]
         loss = F.nll_loss(logits, y_q)
-        preds = logits.detach().permute(0, 2, 1).softmax(-1)
+        preds = logits.detach().permute(0, 2, 1).softmax(-1).argmax(2)
         return loss, preds
 
     def pairwise_cosine_similarity(self, z_s1, z_s2):

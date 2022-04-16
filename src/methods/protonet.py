@@ -45,6 +45,6 @@ class ProtoNet(FSmethod):
         one_hot_q = get_one_hot(y_q, num_classes)  # [batch, q_shot, num_class]
         ce = - (one_hot_q * log_probas).sum(-1)  # [batch, q_shot, num_class]
 
-        preds_q = log_probas.detach().exp()
+        preds_q = log_probas.detach().exp().argmax(2)
 
         return ce, preds_q

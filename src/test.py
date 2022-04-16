@@ -89,7 +89,7 @@ def main(args):
                 enablePrint()
 
             # ============ Evaluation ============
-            loss, soft_preds_q = method(x_s=support,
+            loss, preds_q = method(x_s=support,
                                         x_q=query,
                                         y_s=support_labels,
                                         y_q=query_labels,
@@ -105,9 +105,9 @@ def main(args):
                            query[task_id].cpu().numpy(),
                            support_labels[task_id].cpu().numpy(),
                            query_labels[task_id].cpu().numpy(),
-                           soft_preds_q[task_id].cpu().numpy(),
+                           preds_q[task_id].cpu().numpy(),
                            save_path)
-            predictions.append((soft_preds_q.argmax(-1) == query_labels).float().mean().item())
+            predictions.append((preds_q == query_labels).float().mean().item())
             test_acc, test_std = compute_confidence_interval(predictions)
             if loss is not None:
                 test_loss += loss.detach().mean().item()
@@ -118,7 +118,7 @@ def main(args):
                                          )
                 update_csv(args=args,
                            task_id=i,
-                           acc=test_acc / (i+1),
+                           acc=test_acc,
                            std=test_std,
                            path=os.path.join(res_path, 'test.csv'))
             if i >= args.test_iter:

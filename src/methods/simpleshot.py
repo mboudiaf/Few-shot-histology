@@ -44,5 +44,5 @@ class SimpleShot(FSmethod):
                         + (centroids**2).sum(2).unsqueeze(1)  # noqa: E127
                         + (z_q**2).sum(2).unsqueeze(-1))  # [batch, q_shot, num_class]
 
-        preds_q = (-l2_distance).detach().softmax(-1)
+        preds_q = (-l2_distance).detach().softmax(-1).argmax(2)
         return None, preds_q
