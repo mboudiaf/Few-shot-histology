@@ -14,7 +14,7 @@ DATA:
 MODEL:
   arch: 'resnet18'
   use_fc: True
-  pretrained: True
+  pretrained: False
 
 TRAINING:
   seeds: [2021]
@@ -65,4 +65,4 @@ EPISODES:
   max_support_size_contrib_per_class: 10 # Maximum # of support samples per class
   min_log_weight: -0.69314718055994529 # Do not touch, used to randomly sample support set
   max_log_weight: 0.69314718055994529 # Do not touch, used to randomly sample support set
-  ignore_bilevel_ontology: False  #Whether or not to use superclass for BiLevel datasets (e.g breakhist)
+  ignore_bilevel_ontology: True  #Whether or not to use superclass for BiLevel datasets (e.g breakhist)

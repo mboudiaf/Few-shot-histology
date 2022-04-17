@@ -1,6 +1,5 @@
 data_path="/ssd/dataset/histology/converted"
-# all_sources="nct lc25000 kaggle_crc crc-tp bach breakhis"
-all_sources="breakhis"
+all_sources="nct lc25000 crc-tp breakhis"
 
 for source in ${all_sources}
 do
