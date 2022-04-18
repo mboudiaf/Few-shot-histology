@@ -62,16 +62,6 @@ To run few-shot inference on the trained models:
 Results will be saved as csv files under the specified res_path for each method.
 
 
-#### One source vs multi-sources
-
-For both the episodic and batch datasets, you can use multiples source datasets simultaneously.
-
-**Batch dataset**: In the case where multiples sources are provided (through `--sources`), the dataset will yield samples randomly chosen from possible sources. Hence, samples from different sources can co-exist in the same batch.
-
-**Episodic dataset**: In the case where multiples sources are provided (through `--sources`), the dataset will first randomly chose a source, then provide an episode from this source only. Hence, samples from different sources are never mixed in the same task.
-
-
-
 ## Acknowledgments
 
 I thank the authors of the [open-source TFRecord reader](https://github.com/vahidk/tfrecord) for open sourcing an awesome Pytorch-compatible TFRecordReader !
