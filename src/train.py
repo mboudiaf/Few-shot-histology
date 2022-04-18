@@ -130,10 +130,10 @@ def main(args):
     # ============ Model and optim ================
     if 'MAML' in args.method:
         print(f"Meta {args.arch} loaded")
-        model = meta_dict[args.arch](num_classes=args.num_ways, use_fc=args.use_fc)
+        model = meta_dict[args.arch](pretrained=args.pretrained, num_classes=args.num_ways)
     else:
         print(f"Standard {args.arch} loaded")
-        model = standard_dict[args.arch](num_classes=num_classes, use_fc=args.use_fc)
+        model = standard_dict[args.arch](pretrained=args.pretrained, num_classes=num_classes)
 
     model = model.to(device)
     optimizer = Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -180,7 +180,7 @@ def main(args):
 
             model.eval()
             with torch.no_grad():
-                preds_q = model(input_).softmax(-1)
+                preds_q = model(input_).softmax(-1).argmax(-1)
             model.train()
 
         # Perform optim
@@ -192,7 +192,7 @@ def main(args):
 
         # Log metrics
         train_loss.update(loss.mean().detach(), i == 0)
-        train_acc.update((preds_q.argmax(-1) == target).float().mean(), i == 0)
+        train_acc.update((preds_q == target).float().mean(), i == 0)
         batch_time.update(time.time() - t0, i == 0)
 
         if i % args.train_freq == 0:
@@ -233,7 +233,7 @@ def test(i, loader, model, method, model_dir, metrics, best_val_acc, device):
         support, query, support_labels, query_labels = data
         support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
         query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        loss, soft_preds_q = method(x_s=support,
+        loss, preds_q = method(x_s=support,
                                     x_q=query,
                                     y_s=support_labels,
                                     y_q=query_labels,
@@ -249,9 +249,9 @@ def test(i, loader, model, method, model_dir, metrics, best_val_acc, device):
                        query[task_id].cpu().numpy(),
                        support_labels[task_id].cpu().numpy(),
                        query_labels[task_id].cpu().numpy(),
-                       soft_preds_q[task_id].cpu().numpy(),
+                       preds_q[task_id].cpu().numpy(),
                        save_path)
-        test_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
+        test_acc += (preds_q == query_labels).float().mean()
         tqdm_test_bar.set_description(
             f'Test Prec@1 {test_acc/(j+1):.3f})')
         if loss is not None:
@@ -283,7 +283,7 @@ def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device)
         support, query, support_labels, query_labels = data
         support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
         query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        loss, soft_preds_q = method(x_s=support,
+        loss, preds_q = method(x_s=support,
                                     x_q=query,
                                     y_s=support_labels,
                                     y_q=query_labels,
@@ -300,9 +300,9 @@ def evaluate(i, loader, model, method, model_dir, metrics, best_val_acc, device)
                        query[task_id].cpu().numpy(),
                        support_labels[task_id].cpu().numpy(),
                        query_labels[task_id].cpu().numpy(),
-                       soft_preds_q[task_id].cpu().numpy(),
+                       preds_q[task_id].cpu().numpy(),
                        save_path)
-        val_acc += (soft_preds_q.argmax(-1) == query_labels).float().mean()
+        val_acc += (preds_q == query_labels).float().mean()
         tqdm_eval_bar.set_description(
             f'Val Prec@1 {val_acc/(j+1):.3f})')
         if loss is not None:

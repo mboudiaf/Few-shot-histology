@@ -62,7 +62,8 @@ class MAML(FSmethod):
                 outer_loss += F.cross_entropy(query_logit, y_query)
                 soft_preds[task_idx] = query_logit.detach().softmax(-1)
         model.eval()
-        return outer_loss, soft_preds
+        preds_q = soft_preds.argmax(2)
+        return outer_loss, preds_q
 
     def gradient_update_parameters(self,
                                    model,

@@ -4,3 +4,4 @@ from .matchingnet import *
 from .maml import *
 from .tim import *
 from .finetune import *
+from .metaoptnet import *

@@ -121,4 +121,4 @@ class Finetune(FSmethod):
                 #                  y_s=y_s)
 
         probs_q = classifier(z_q[0]).softmax(-1).unsqueeze(0)
-        return loss.detach(), probs_q.detach()
+        return loss.detach(), probs_q.detach().argmax(2)

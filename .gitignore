@@ -1,5 +1,10 @@
 checkpoints/
 results/
+notebooks/
+scripts/deploy/
+scripts/import/
+scripts/train_beluga.sh
+*.out
 *.sublime-project
 *.sublime-workspace
 

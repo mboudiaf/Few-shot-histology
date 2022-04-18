@@ -1,25 +1,21 @@
-# Histology Meta-dataset (pytorch)
+# FHIST: A benchmark for Few-shot Classification of Histological Images
 
+This Repo contains the code and few-shot tasks of our paper [FHIST](). FHIST introduces a highly diversified public benchmark, gathered from various public datasets, for few-shot histology data classification. 
+We build few-shot tasks in three different scenarios with various tissue types, different levels of domain shifts stemming from various cancer sites, and different class-granularity levels. We evaluate the performances of state-of-the-art few-shot learning methods, initially designed for natural images, on our benchmark. 
 
-## Overall structure
+## Getting Started
 
-Here is a rough overview of the different modules of the data pipeline and how they relate with one another:
+### Installation
 
+This code is tested with python 3.8. To install required packages:
 
-<img src="figures/overview.png" width="800"/>
+```python
+    pip install -r requirements
+```
 
+### Data
 
-The general idea is that each `*.tfrecords` represents a class of a dataset. Therefore, we can create one TFRecordDataset per class. So for each dataset (e.g breakhis), we will have a list of all TFRecordDataset (one per class), which are randomly sampled from.
-
-## Data
-
-#### Downloading data (recommended)
-
-I have put all the converted data at [converted_data](https://drive.google.com/file/d/1W2xxzag9oetbXlR5lcxeRjlmq1ibNFjm/view?usp=sharing).
-
-#### Direct download does not work ? (not tested from scratch)
-
-In this case, you will need to download the data by yourself, and put all folders in a single folder. Then you can run the conversion script `scripts/convert_datasets.sh` (please before doing this, change the data_root and record_root path):
+You need to download the datasets ([crc-tp](https://warwick.ac.uk/fac/cross_fac/tia/data/crc-tp), [nct](https://zenodo.org/record/1214456#.Ylxt0XVKiUk), [lc25000](https://academictorrents.com/details/7a638ed187a6180fd6e464b3666a6ea0499af4af), [breakhis](https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-BreakHis/)), and put all folders in a single folder. Then you can run the conversion script `scripts/convert_datasets.sh` (change the data_root and record_root path):
 
 ```python
     bash scripts/convert_datasets.sh
@@ -27,84 +23,44 @@ In this case, you will need to download the data by yourself, and put all folder
 
 This scripts will put all the datasets in the same `*.tfrecords` format.
 
+#### Make Index files
+
+Run the following to create index files for each tfrecord:(Specify the data_path in the bash script file)
+
+```python
+    bash scripts/make_index_files.sh
+```
 
 ## Usage
 
-I provide an example of how to create your dataloaders in `example.py`. To run it, execute:
-```python
-python3 example.py with --batch_size 124 --sources 'breakhis' 'bach' --data_path 'your_path_to_data_folder'
-```
+### Training
 
-
-
-#### Batch dataset (standard form)
-
-For a standard batch dataset:
+You can find implementations of some SOTA few-shot learning methods under src/methods. In order to train a model, run the following command specifying the few-shot method, train, validation and test sources:
 
 ```python
-    # Training or validation loop
-    for i, (support, query, support_labels, query_labels) in enumerate(episodic_loader):
-        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        # Do some operations
-
-    # Form a batch dataset
-    batch_dataset = pipeline.make_batch_pipeline(dataset_spec_list=all_dataset_specs,
-                                                 split=split,
-                                                 data_config=data_config)
-
-    # Use a standard dataloader
-    batch_loader = DataLoader(dataset=batch_dataset,
-
-                              batch_size=data_config.batch_size,
-                              num_workers=data_config.num_workers)
+    bash scripts/train.sh <method> <train> <valid> <test>
 ```
 
-#### Episodic dataset
+Here's an example:
 
-Once the dataset_spec of each dataset has been recovered, we are ready to get the datasets. For an episodic dataset:
 ```python
-    # Form an episodic dataset
-    split = Split["TRAIN"]
-    episodic_dataset = pipeline.make_episode_pipeline(dataset_spec_list=all_dataset_specs,
-                                                      spl
-                                                      it=split,
-                                                      data_config=data_config,
-                                                      episode_descr_config=episod_config)
-
-    # Use a standard dataloader
-    episodic_loader = DataLoader(dataset=episodic_dataset,
-                                 batch_size=1,
-                                 num_workers=data_config.num_workers)
-
-    # Training or validation loop
-    for i, (support, query, support_labels, query_labels) in enumerate(episodic_loader):
-        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        # Do some operations
+    bash scripts/train.sh tim crc-tp nct lc25000
 ```
 
+The above script will use standard supervised cross-entropy for training, and TIM method for evaluation on valid and test sets. Replace TIM with a meta-learning method(e.g. protonet), to start episodic training.
 
-#### One source vs multi-sources
+In order to change the backbone network, simply change the "arch" value in the base.yaml file in the config path or add --arch in the opts list. base.yaml file includes all the parameters used in the code. You can also change hyperparameters of each method from their corresponding yaml file in the config path.  
 
-For both the episodic and batch datasets, you can use multiples source datasets simultaneously.
+### Inference
 
-**Batch dataset**: In the case where multiples sources are provided (through `--sources`), the dataset will yield samples randomly chosen from possible sources. Hence, samples from different sources can co-exist in the same batch.
+To run few-shot inference on the trained models:
 
-**Episodic dataset**: In the case where multiples sources are provided (through `--sources`), the dataset will first randomly chose a source, then provide an episode from this source only. Hence, samples from different sources are never mixed in the same task.
-
-#### Options
-
-There exist several options to build the dataset. If you want the full list, please use:
 ```python
-    python3 example.py --help
+    bash scripts/test.sh <method> <shot> <train> <test> 
 ```
- IF you want to know all possible transforms, go to `transforms.py`.
 
+Results will be saved as csv files under the specified res_path for each method.
 
-## Contributions
-
-Please, start a new branch for every new feature you want to add :) The idea is that this repo will be the one we may use for the challenge, so let us try to keep it as clean as possible.
 
 ## Acknowledgments
 

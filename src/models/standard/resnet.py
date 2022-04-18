@@ -1,4 +1,5 @@
 import torch.nn as nn
+from .utils import load_pretrained_weights
 
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
@@ -83,10 +84,10 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False, use_fc=True):
+    def __init__(self, block, layers, num_classes=1000, zero_init_residual=False):
         super(ResNet, self).__init__()
         self.inplanes = 64
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1,
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=1, padding=1,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -95,8 +96,7 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        if use_fc:
-            self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -149,43 +149,55 @@ class ResNet(nn.Module):
         return x
 
 
-def resnet10(**kwargs):
+def resnet10(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-10 model.
     """
     model = ResNet(BasicBlock, [1, 1, 1, 1], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet10", load_fc=False)
     return model
 
 
-def resnet18(**kwargs):
+def resnet18(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-18 model.
     """
     model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet18", load_fc=False)
     return model
 
 
-def resnet34(**kwargs):
+def resnet34(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-34 model.
     """
     model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet34", load_fc=False)
     return model
 
 
-def resnet50(**kwargs):
+def resnet50(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-50 model.
     """
     model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet50", load_fc=False)
     return model
 
 
-def resnet101(**kwargs):
+def resnet101(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-101 model.
     """
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet101", load_fc=False)
     return model
 
 
-def resnet152(**kwargs):
+def resnet152(pretrained : bool = False, **kwargs):
     """Constructs a ResNet-152 model.
     """
     model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
+    if pretrained:
+        model = load_pretrained_weights(model, "resnet152", load_fc=False)
     return model

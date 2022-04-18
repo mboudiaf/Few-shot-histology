@@ -1,5 +1,5 @@
 import torch.nn as nn
-import torch.tensor as tensor
+from torch import Tensor as tensor
 import argparse
 from typing import Tuple
 

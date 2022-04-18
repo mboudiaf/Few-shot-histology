@@ -78,5 +78,5 @@ class TIM(FSmethod):
             loss.backward()
             optimizer.step()
 
-        preds_q = self.get_logits(z_q, centroids).detach()
+        preds_q = self.get_logits(z_q, centroids).detach().argmax(2)
         return loss, preds_q

@@ -1,0 +1,8 @@
+TRAINING:
+  episodic_training: True
+
+METHOD:
+  method: 'MetaOptNet'
+  batch_size: 8
+  head: 'SVM'
+  eps: 0.00000001
