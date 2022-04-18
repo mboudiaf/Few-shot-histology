@@ -15,13 +15,7 @@ This code is tested with python 3.8. To install required packages:
 
 ### Data
 
-#### Downloading data (recommended)
-
-I have put all the converted data at [converted_data](https://drive.google.com/file/d/1W2xxzag9oetbXlR5lcxeRjlmq1ibNFjm/view?usp=sharing).
-
-#### Direct download does not work ?(or) Want to add your own dataset?
-
-In this case, you will need to download the data([crc-tp](https://www.researchgate.net/publication/344188411_Multiplex_Cellular_Communities_in_Multi-Gigapixel_Colorectal_Cancer_Histology_Images_for_Tissue_Phenotyping), [nct](https://zenodo.org/record/1214456#.Ylxt0XVKiUk), [lc25000](https://academictorrents.com/details/7a638ed187a6180fd6e464b3666a6ea0499af4af), [breakhis](https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-BreakHis/)) by yourself, and put all folders in a single folder. Then you can run the conversion script `scripts/convert_datasets.sh` (please before doing this, change the data_root and record_root path):
+You need to download the datasets ([crc-tp](https://warwick.ac.uk/fac/cross_fac/tia/data/crc-tp), [nct](https://zenodo.org/record/1214456#.Ylxt0XVKiUk), [lc25000](https://academictorrents.com/details/7a638ed187a6180fd6e464b3666a6ea0499af4af), [breakhis](https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-BreakHis/)), and put all folders in a single folder. Then you can run the conversion script `scripts/convert_datasets.sh` (change the data_root and record_root path):
 
 ```python
     bash scripts/convert_datasets.sh
@@ -66,64 +60,6 @@ To run few-shot inference on the trained models:
 ```
 
 Results will be saved as csv files under the specified res_path for each method.
-
-
-## Overall Structure of the Data Pipeline
-
-Here is a rough overview of the different modules of the data pipeline and how they relate with one another:
-
-
-<img src="figures/overview.png" width="800"/>
-
-
-The general idea is that each `*.tfrecords` represents a class of a dataset. Therefore, we can create one TFRecordDataset per class. So for each dataset (e.g breakhis), we will have a list of all TFRecordDataset (one per class), which are randomly sampled from.
-
-#### Batch dataset (standard form)
-
-For a standard batch dataset:
-
-```python
-    # Training or validation loop
-    for i, (support, query, support_labels, query_labels) in enumerate(episodic_loader):
-        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        # Do some operations
-
-    # Form a batch dataset
-    batch_dataset = pipeline.make_batch_pipeline(dataset_spec_list=all_dataset_specs,
-                                                 split=split,
-                                                 data_config=data_config)
-
-    # Use a standard dataloader
-    batch_loader = DataLoader(dataset=batch_dataset,
-
-                              batch_size=data_config.batch_size,
-                              num_workers=data_config.num_workers)
-```
-
-#### Episodic dataset
-
-Once the dataset_spec of each dataset has been recovered, we are ready to get the datasets. For an episodic dataset:
-```python
-    # Form an episodic dataset
-    split = Split["TRAIN"]
-    episodic_dataset = pipeline.make_episode_pipeline(dataset_spec_list=all_dataset_specs,
-                                                      spl
-                                                      it=split,
-                                                      data_config=data_config,
-                                                      episode_descr_config=episod_config)
-
-    # Use a standard dataloader
-    episodic_loader = DataLoader(dataset=episodic_dataset,
-                                 batch_size=1,
-                                 num_workers=data_config.num_workers)
-
-    # Training or validation loop
-    for i, (support, query, support_labels, query_labels) in enumerate(episodic_loader):
-        support, support_labels = support.to(device), support_labels.to(device, non_blocking=True)
-        query, query_labels = query.to(device), query_labels.to(device, non_blocking=True)
-        # Do some operations
-```
 
 
 #### One source vs multi-sources
